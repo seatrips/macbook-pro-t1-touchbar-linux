@@ -1,0 +1,7 @@
+#!/bin/sh
+# BCM43602 (MacBookPro14,3) overdrives TX at a bogus 31 dBm, which kills
+# reception. Cap it at 10 dBm whenever the WiFi interface comes up.
+[ "$1" = "wlp3s0" ] || exit 0
+case "$2" in
+  up|dhcp4-change|reapply) /usr/bin/iw dev wlp3s0 set txpower fixed 1000 ;;
+esac

@@ -87,6 +87,33 @@ Devices you've already paired keep working. To pair a new one, use `bluetui` (or
 systemctl --user unmask bt-agent.service && systemctl --user enable --now bt-agent.service
 ```
 
+## Optional: fix weak Wi-Fi signal
+
+This only applies to models with the Broadcom **BCM43602** Wi-Fi chip (14,2 and 14,3, and some 13,x; check with `lspci | grep -i 43602`). `install.sh` doesn't do it.
+
+The Linux firmware for this chip is from 2015 and can't detect the country it's in. It then transmits at a bogus **31 dBm**, which also drowns out its own receiver: the signal shows around -93 dBm even with a phone hotspot right next to the laptop, and speeds drop to a few Mbit/s ([kernel bug 193121](https://bugzilla.kernel.org/show_bug.cgi?id=193121)). Capping transmit power at 10 dBm fixes most of it. On the 14,3 this setup was written on:
+
+| | Before | After |
+|---|---|---|
+| Signal | -93 dBm | -83 dBm |
+| Download (rx) | 2 Mbit/s | 86.6 Mbit/s |
+| Upload (tx) | 6.5 Mbit/s | 39 Mbit/s |
+
+Try it first (lasts until reboot; replace `wlp3s0` with your interface from `iw dev`):
+
+```bash
+sudo iw dev wlp3s0 set txpower fixed 1000
+iw dev wlp3s0 link | grep -E 'signal|bitrate'
+```
+
+To keep it, install [`etc/NetworkManager/dispatcher.d/90-wifi-txpower`](etc/NetworkManager/dispatcher.d/90-wifi-txpower). It re-applies the cap every time Wi-Fi connects (after boot, sleep or a reconnect). A udev rule doesn't work here, because the driver ignores the setting until the interface is up.
+
+```bash
+sudo install -o root -g root -m 755 etc/NetworkManager/dispatcher.d/90-wifi-txpower /etc/NetworkManager/dispatcher.d/
+```
+
+Check with `iw dev wlp3s0 info | grep txpower` (should say `10.00 dBm`). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. Wi-Fi stays 2.4 GHz only; a USB Wi-Fi adapter is the only full fix.
+
 ## Checking it works
 
 - `hyprctl configerrors` should print nothing.
