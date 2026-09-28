@@ -1,0 +1,7 @@
+// US layout for ISO MacBook: key left of 1 (<LSGT>) types § / ±
+default partial alphanumeric_keys
+xkb_symbols "basic" {
+  include "us(basic)"
+  name[Group1] = "English (US, MacBook ISO)";
+  key <LSGT> { [ section, plusminus ] };
+};
