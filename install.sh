@@ -28,6 +28,14 @@ sudo install -m644 etc/modprobe.d/hid_apple.conf /etc/modprobe.d/hid_apple.conf
 sudo install -d /etc/libinput
 [[ -e /etc/libinput/local-overrides.quirks ]] && sudo cp /etc/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks.bak.$ts
 sudo install -m644 etc/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
+# Omarchy loads applespi from the initramfs, so the Fn remap only survives a
+# reboot once the initramfs is rebuilt with the new modprobe.d file.
+echo "==> Rebuilding initramfs so the Fn remap survives reboots"
+if command -v limine-mkinitcpio >/dev/null; then
+  sudo limine-mkinitcpio
+else
+  sudo mkinitcpio -P
+fi
 # Apply the Fn remap now, without a reboot.
 [[ -e /sys/module/applespi/parameters/fnremap ]] && echo 7 | sudo tee /sys/module/applespi/parameters/fnremap >/dev/null
 sudo systemctl enable --now keyd
