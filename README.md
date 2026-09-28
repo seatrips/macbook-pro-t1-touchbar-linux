@@ -61,7 +61,7 @@ The script asks for your sudo password for the system files. It backs up every f
 
 - **Right Option is taken.** The driver can only remap Fn to a key the MacBook already has. Right Option is the least used, so it now works as a second Fn.
 - **No Page Up / Page Down / Home / End.** Normally Fn + arrows give those. Here Fn + arrows control volume and brightness instead.
-- **No Compose key.** Omarchy normally uses Caps Lock as Compose for special characters. That's switched off so Caps Lock works normally.
+- **No Compose key.** Omarchy normally uses Caps Lock as Compose for special characters. That's switched off so Caps Lock works normally. If Caps Lock doesn't give capitals but strange small letters (Caps then `f` `f` gives `ﬀ`), this is the reason.
 - **No 3-finger swipes.** They never reached Hyprland on this touchpad, so the workspace swipe uses 4 fingers.
 - **Right click pastes inside Claude Code.** That's Claude Code's own behavior, not a touchpad problem. Everywhere else a right click is a normal right click.
 
