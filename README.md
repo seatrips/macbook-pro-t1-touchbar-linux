@@ -1,4 +1,6 @@
-# Omarchy on a MacBook Pro with Touch Bar
+# Omarchy on a MacBook Pro with Touch Bar: a workaround
+
+> **This does not make the Touch Bar work.** It stays blank. Instead, this setup puts the keys the Touch Bar would give you (Esc, F1–F12, volume, brightness) on the regular keyboard.
 
 Keyboard and touchpad setup for **Omarchy** (Hyprland) on a **MacBook Pro 14,3** (15", 2017, Touch Bar, T1 chip). It should also work on other 2016–2017 Touch Bar models (13,x / 14,2 / 14,3), whose keyboard and touchpad use the `applespi` driver.
 
@@ -38,8 +40,8 @@ This setup puts all those missing keys on the physical keyboard.
 On a fresh Omarchy install:
 
 ```bash
-git clone https://github.com/seatrips/omarchy-macbook-touchbar.git ~/omarchy-macbook-touchbar
-cd ~/omarchy-macbook-touchbar
+git clone https://github.com/seatrips/omarchy-macbook-touchbar-workaround.git ~/omarchy-macbook-touchbar-workaround
+cd ~/omarchy-macbook-touchbar-workaround
 ./install.sh
 ```
 
