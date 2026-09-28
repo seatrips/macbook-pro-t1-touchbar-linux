@@ -1,0 +1,12 @@
+# Known-good on Arch/Omarchy (checked 2026-09-28)
+SCRIPTWHITELIST=/usr/bin/egrep
+SCRIPTWHITELIST=/usr/bin/fgrep
+SCRIPTWHITELIST=/usr/bin/ldd
+ALLOWHIDDENFILE=/etc/.updated
+ALLOWHIDDENFILE=/usr/share/man/man5/.k5identity.5.gz
+ALLOWHIDDENFILE=/usr/share/man/man5/.k5login.5.gz
+# Empty shared-memory file seen on the machine this was written on
+ALLOWDEVFILE=/dev/shm/BC2-GPU-*
+# sshd is disabled; OpenSSH's defaults are safe
+ALLOW_SSH_ROOT_USER=unset
+ALLOW_SSH_PROT_V1=2

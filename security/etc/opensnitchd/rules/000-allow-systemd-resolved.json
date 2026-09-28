@@ -1,0 +1,12 @@
+{
+  "created": "2026-09-28T19:47:16+02:00",
+  "updated": "2026-09-28T19:47:16+02:00",
+  "name": "000-allow-systemd-resolved",
+  "description": "System DNS resolver",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {"type": "simple", "operand": "process.path", "sensitive": false, "data": "/usr/lib/systemd/systemd-resolved", "list": []}
+}

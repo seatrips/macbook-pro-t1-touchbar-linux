@@ -1,0 +1,12 @@
+{
+  "created": "2026-09-28T19:47:16+02:00",
+  "updated": "2026-09-28T19:47:16+02:00",
+  "name": "000-allow-systemd-timesyncd",
+  "description": "Clock sync (NTP)",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {"type": "simple", "operand": "process.path", "sensitive": false, "data": "/usr/lib/systemd/systemd-timesyncd", "list": []}
+}

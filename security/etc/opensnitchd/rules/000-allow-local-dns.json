@@ -1,0 +1,15 @@
+{
+  "created": "2026-09-28T19:47:16+02:00",
+  "updated": "2026-09-28T19:47:16+02:00",
+  "name": "000-allow-local-dns",
+  "description": "Any program may ask the local resolver stub; resolved itself is the one going out",
+  "enabled": true,
+  "precedence": true,
+  "nolog": false,
+  "action": "allow",
+  "duration": "always",
+  "operator": {"type": "list", "operand": "list", "sensitive": false, "data": "", "list": [
+    {"type": "simple", "operand": "dest.ip", "sensitive": false, "data": "127.0.0.53", "list": null},
+    {"type": "simple", "operand": "dest.port", "sensitive": false, "data": "53", "list": null}
+  ]}
+}

@@ -115,6 +115,36 @@ sudo install -o root -g root -m 755 etc/NetworkManager/dispatcher.d/90-wifi-txpo
 
 Reboot once to confirm it sticks (tested on the 14,3: after a reboot the cap was applied without doing anything). Then check with `iw dev wlp3s0 info | grep txpower`, which should say `10.00 dBm`. If it still says `31.00 dBm`, the interface name in the script doesn't match yours, or the file isn't executable and owned by root (NetworkManager skips it otherwise). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. Wi-Fi stays 2.4 GHz only; a USB Wi-Fi adapter is the only full fix.
 
+## Optional: Security Watch (firewall and daily security checks)
+
+This isn't specific to MacBooks, and `install.sh` doesn't do it. It's for when you use the laptop for work or private things and want to hear about problems without checking yourself. It sets up:
+
+- **[OpenSnitch](https://github.com/evilsocket/opensnitch)**, an application firewall. The first time a program connects to the internet, a popup asks whether to allow it. Three rules come preinstalled so the basics work without popups: local DNS, the system resolver (`systemd-resolved`) and clock sync (`systemd-timesyncd`).
+- **Security Watch**, a script that a systemd timer runs once a day (and catches up after the laptop was off). It sends a desktop notification **only for new findings**, so it stays quiet until something needs doing:
+  - `arch-audit --upgradable`: installed packages with known vulnerabilities that an update fixes. Run `omarchy update`.
+  - `rkhunter`: rootkits and system files that were swapped out. A pacman hook refreshes its baseline after every update, so updates don't cause alerts.
+  - `lynis`: a system hardening audit, on Sundays.
+
+Install it with:
+
+```bash
+cd ~/omarchy-macbook-touchbar-workaround && ./security/install.sh
+sudo systemctl start security-watch   # first check now instead of waiting a day
+```
+
+Then open OpenSnitch's preferences (the tray icon) and set the popup's **default duration to "once"**. Otherwise a popup you miss blocks that program for 12 hours. Allow the programs you trust "always": your browser, `NetworkManager`, `pacman`, `git-remote-http`, and `arch-audit` (it downloads the Arch security feed).
+
+| File in this repo | Installed to | Purpose |
+|---|---|---|
+| `security/usr/local/bin/security-watch` | `/usr/local/bin/` | Runs the three checks and notifies you about new findings. The details go to `/var/log/security-watch.log`. |
+| `security/etc/systemd/system/security-watch.{service,timer}` | `/etc/systemd/system/` | Runs the script daily, 10 minutes after boot and in the background at low priority. |
+| `security/etc/pacman.d/hooks/rkhunter-propupd.hook` | `/etc/pacman.d/hooks/` | Updates rkhunter's file baseline after package updates. |
+| `security/etc/rkhunter.conf.local` | `/etc/` | Whitelists rkhunter warnings that are normal on Arch/Omarchy (`egrep`/`fgrep`/`ldd` being scripts, hidden Kerberos man pages, unset sshd options while sshd is off). |
+| `security/etc/lynis/custom.prf` | `/etc/lynis/` | Skips lynis' "vulnerable packages" test, because it also counts CVEs with no fix yet. `arch-audit --upgradable` covers the ones you can fix. |
+| `security/etc/opensnitchd/rules/000-allow-*.json` | `/etc/opensnitchd/rules/` | The three basic allow rules. |
+
+If a notification turns out to be a false positive on your machine, add it to `/etc/rkhunter.conf.local` (for rkhunter) or `/etc/lynis/custom.prf` (`skip-test=<ID>`, for lynis). To undo: `sudo systemctl disable --now security-watch.timer opensnitchd`, remove the `opensnitch-ui` line from `~/.config/hypr/autostart.lua`, and remove the files listed above.
+
 ## Checking it works
 
 - `hyprctl configerrors` should print nothing.
@@ -122,3 +152,4 @@ Reboot once to confirm it sticks (tested on the 14,3: after a reboot the cap was
 - `systemctl is-active keyd` should print `active`.
 - On a web page, **Fn + 5** (F5) should reload the page.
 - If you installed the optional Wi-Fi fix: `iw dev wlp3s0 info | grep txpower` should print `10.00 dBm` after a reboot.
+- If you installed Security Watch: `systemctl list-timers security-watch.timer` should show the next run, and `tail /var/log/security-watch.log` should end with `run complete`.

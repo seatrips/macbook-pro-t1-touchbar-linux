@@ -1,0 +1,58 @@
+#!/bin/bash
+# security-watch: runs security checks and sends a desktop notification
+# only for findings that weren't reported before.
+set -u
+
+STATE=/var/lib/security-watch
+LOG=/var/log/security-watch.log
+NOTIFY_USER=CHANGEME  # install.sh sets this to your user
+mkdir -p "$STATE"
+
+# Only one run at a time
+exec 9>"$STATE/lock"
+flock -n 9 || exit 0
+
+log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+notify() {
+  local uid
+  uid=$(id -u "$NOTIFY_USER")
+  [[ -S /run/user/$uid/bus ]] || return 1
+  runuser -u "$NOTIFY_USER" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+    notify-send -u critical -a "Security Watch" "$1" "$2"
+}
+
+# report NAME TITLE < findings
+# Notifies only about lines not already reported. They count as reported
+# only once the notification is delivered, so nothing is lost while logged out.
+report() {
+  local name=$1 title=$2 seen="$STATE/$1.seen" current="$STATE/$1.current" new
+  sort -u > "$current"
+  touch "$seen"
+  new=$(comm -23 "$current" "$seen")
+  if [[ -n $new ]]; then
+    log "$name: new findings:"$'\n'"$new"
+    notify "$title" "$(head -5 <<<"$new")"$'\n\n'"Details: /var/log/security-watch.log" \
+      && cp "$current" "$seen"
+  else
+    # Forget fixed findings so they alert again if they come back
+    cp "$current" "$seen"
+  fi
+}
+
+# 1. Installed packages with known vulnerabilities that an update fixes
+arch-audit --upgradable --format '%n: %t (%s)' 2>/dev/null \
+  | report arch-audit "Security updates available — run omarchy update"
+
+# 2. Rootkit and tampered-file check
+rkhunter --check --skip-keypress --report-warnings-only --nocolors 2>/dev/null \
+  | grep -E '^Warning:' | report rkhunter "Rootkit Hunter warning"
+
+# 3. Weekly system hardening audit (Sundays, or if it has never run)
+if [[ $(date +%u) == 7 || ! -f $STATE/lynis.seen ]]; then
+  lynis audit system --quick --quiet --no-colors >/dev/null 2>&1
+  grep -E '^warning\[\]=' /var/log/lynis-report.dat 2>/dev/null \
+    | cut -d'|' -f1-2 | sed 's/^warning\[\]=//' | report lynis "Lynis security warning"
+fi
+
+log "run complete"

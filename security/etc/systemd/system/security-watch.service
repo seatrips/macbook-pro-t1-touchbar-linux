@@ -1,0 +1,9 @@
+[Unit]
+Description=Security Watch checks
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/security-watch
+Nice=10
+IOSchedulingClass=idle

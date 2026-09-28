@@ -1,0 +1,3 @@
+# Unfixed CVEs are covered by arch-audit --upgradable in security-watch,
+# which only alerts when an update actually fixes something.
+skip-test=PKGS-7322

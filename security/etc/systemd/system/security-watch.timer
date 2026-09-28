@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Security Watch daily
+
+[Timer]
+OnBootSec=10min
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
