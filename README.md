@@ -72,6 +72,21 @@ The script asks for your sudo password for the system files. It backs up every f
 - **No 3-finger swipes.** They never reached Hyprland on this touchpad, so the workspace swipe uses 4 fingers.
 - **Right click pastes inside Claude Code.** That's Claude Code's own behavior, not a touchpad problem. Everywhere else a right click is a normal right click.
 
+## Optional: stop Bluetooth auto-accepting pairings
+
+This isn't specific to MacBooks, and `install.sh` doesn't do it. Omarchy runs `bt-agent -c NoInputNoOutput` (the `bt-agent` user service), which **accepts every Bluetooth pairing request without asking**. While Bluetooth is on, someone nearby who knows your laptop's Bluetooth address could pair a device, such as a fake keyboard, and you'd see no prompt. On a laptop you use for work or private things, turn it off:
+
+```bash
+systemctl --user disable --now bt-agent.service
+systemctl --user mask bt-agent.service
+```
+
+Devices you've already paired keep working. To pair a new one, use `bluetui` (or the Omarchy menu), which asks you to confirm. To undo:
+
+```bash
+systemctl --user unmask bt-agent.service && systemctl --user enable --now bt-agent.service
+```
+
 ## Checking it works
 
 - `hyprctl configerrors` should print nothing.
