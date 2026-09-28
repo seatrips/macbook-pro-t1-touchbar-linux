@@ -106,7 +106,7 @@ sudo iw dev wlp3s0 set txpower fixed 1000
 iw dev wlp3s0 link | grep -E 'signal|bitrate'
 ```
 
-To keep it, install [`etc/NetworkManager/dispatcher.d/90-wifi-txpower`](etc/NetworkManager/dispatcher.d/90-wifi-txpower). It re-applies the cap every time Wi-Fi connects (after boot, sleep or a reconnect). A udev rule doesn't work here, because the driver ignores the setting until the interface is up.
+To keep it, install [`etc/NetworkManager/dispatcher.d/90-wifi-txpower`](etc/NetworkManager/dispatcher.d/90-wifi-txpower). It re-applies the cap every time Wi-Fi connects (after boot, sleep or a reconnect). It assumes the interface is `wlp3s0`; edit the name in the script if yours differs. A udev rule doesn't work here, because the driver ignores the setting until the interface is up.
 
 ```bash
 sudo install -o root -g root -m 755 etc/NetworkManager/dispatcher.d/90-wifi-txpower /etc/NetworkManager/dispatcher.d/
