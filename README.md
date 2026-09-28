@@ -37,12 +37,16 @@ This setup puts all those missing keys on the physical keyboard.
 
 ## Install
 
-On a fresh Omarchy install:
+On a fresh Omarchy install, one command sets up everything:
 
 ```bash
-git clone https://github.com/seatrips/omarchy-macbook-touchbar-workaround.git ~/omarchy-macbook-touchbar-workaround
-cd ~/omarchy-macbook-touchbar-workaround
-./install.sh
+git clone https://github.com/seatrips/omarchy-macbook-touchbar-workaround.git ~/omarchy-macbook-touchbar-workaround && ~/omarchy-macbook-touchbar-workaround/install.sh
+```
+
+Already cloned it? Update and re-apply with:
+
+```bash
+cd ~/omarchy-macbook-touchbar-workaround && git pull && ./install.sh
 ```
 
 The script asks for your sudo password for the system files. It backs up every file it replaces to `<file>.bak.<timestamp>`, so you can run it more than once. The changes apply right away, with no reboot.
