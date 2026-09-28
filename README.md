@@ -93,11 +93,12 @@ This only applies to models with the Broadcom **BCM43602** Wi-Fi chip (14,2 and 
 
 The Linux firmware for this chip is from 2015 and can't detect the country it's in. It then transmits at a bogus **31 dBm**, which also drowns out its own receiver: the signal shows around -93 dBm even with a phone hotspot right next to the laptop, and speeds drop to a few Mbit/s ([kernel bug 193121](https://bugzilla.kernel.org/show_bug.cgi?id=193121)). Capping transmit power at 10 dBm fixes most of it. On the 14,3 this setup was written on:
 
-| | Before | After |
-|---|---|---|
-| Signal | -93 dBm | -83 dBm |
-| Download (rx) | 2 Mbit/s | 86.6 Mbit/s |
-| Upload (tx) | 6.5 Mbit/s | 39 Mbit/s |
+| | Before | After (first test) | After reboot, set by the script |
+|---|---|---|---|
+| Transmit power | 31 dBm | 10 dBm | 10 dBm |
+| Signal | -93 dBm | -83 dBm | -81 dBm |
+| Download (rx) | 2 Mbit/s | 86.6 Mbit/s | 86.6 Mbit/s |
+| Upload (tx) | 6.5 Mbit/s | 39 Mbit/s | 78 Mbit/s |
 
 Try it first (lasts until reboot; replace `wlp3s0` with your interface from `iw dev`):
 
@@ -112,7 +113,7 @@ To keep it, install [`etc/NetworkManager/dispatcher.d/90-wifi-txpower`](etc/Netw
 sudo install -o root -g root -m 755 etc/NetworkManager/dispatcher.d/90-wifi-txpower /etc/NetworkManager/dispatcher.d/
 ```
 
-Check with `iw dev wlp3s0 info | grep txpower` (should say `10.00 dBm`). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. Wi-Fi stays 2.4 GHz only; a USB Wi-Fi adapter is the only full fix.
+Reboot once to confirm it sticks (tested on the 14,3: after a reboot the cap was applied without doing anything). Then check with `iw dev wlp3s0 info | grep txpower`, which should say `10.00 dBm`. If it still says `31.00 dBm`, the interface name in the script doesn't match yours, or the file isn't executable and owned by root (NetworkManager skips it otherwise). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. Wi-Fi stays 2.4 GHz only; a USB Wi-Fi adapter is the only full fix.
 
 ## Checking it works
 
@@ -120,3 +121,4 @@ Check with `iw dev wlp3s0 info | grep txpower` (should say `10.00 dBm`). To undo
 - `cat /sys/module/applespi/parameters/fnremap` should print `7`. If it prints `0` after a reboot, the initramfs wasn't rebuilt: run `sudo limine-mkinitcpio` and reboot.
 - `systemctl is-active keyd` should print `active`.
 - On a web page, **Fn + 5** (F5) should reload the page.
+- If you installed the optional Wi-Fi fix: `iw dev wlp3s0 info | grep txpower` should print `10.00 dBm` after a reboot.
