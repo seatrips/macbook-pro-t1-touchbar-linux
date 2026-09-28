@@ -7,5 +7,5 @@
 MatchUdevType=touchpad
 MatchBus=spi
 MatchVendor=0x06CB
-AttrTouchSizeRange=200:170
-AttrPalmSizeThreshold=1200
+AttrTouchSizeRange=250:210
+AttrPalmSizeThreshold=1000
