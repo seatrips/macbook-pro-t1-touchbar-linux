@@ -25,6 +25,9 @@ sudo install -d /etc/keyd
 sudo install -m644 etc/keyd/default.conf /etc/keyd/default.conf
 sudo install -m644 etc/modprobe.d/applespi.conf /etc/modprobe.d/applespi.conf
 sudo install -m644 etc/modprobe.d/hid_apple.conf /etc/modprobe.d/hid_apple.conf
+sudo install -d /etc/libinput
+[[ -e /etc/libinput/local-overrides.quirks ]] && sudo cp /etc/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks.bak.$ts
+sudo install -m644 etc/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
 # Apply the Fn remap now, without a reboot.
 [[ -e /sys/module/applespi/parameters/fnremap ]] && echo 7 | sudo tee /sys/module/applespi/parameters/fnremap >/dev/null
 sudo systemctl enable --now keyd
@@ -32,3 +35,4 @@ sudo keyd reload
 
 hyprctl reload >/dev/null 2>&1 || true
 echo "Done. Check 'hyprctl configerrors' shows nothing."
+echo "Log out and back in once for the touchpad tap settings to take effect."

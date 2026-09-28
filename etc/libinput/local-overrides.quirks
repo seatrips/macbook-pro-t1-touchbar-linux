@@ -1,0 +1,11 @@
+# Fewer accidental taps on the MacBook Pro Touch Bar (applespi) touchpad.
+# Overrides /usr/share/libinput/50-system-apple.quirks (TouchSizeRange=150:130, PalmSizeThreshold=1600).
+# Higher TouchSizeRange = light brushes don't count as touches (and so can't tap).
+# Lower PalmSizeThreshold = large contacts are ignored as palms sooner.
+# Takes effect after logging out and back in.
+[Apple Laptop Touchpad (SPI) applespi driver - fewer accidental taps]
+MatchUdevType=touchpad
+MatchBus=spi
+MatchVendor=0x06CB
+AttrTouchSizeRange=200:170
+AttrPalmSizeThreshold=1200
