@@ -38,8 +38,8 @@ This setup puts all those missing keys on the physical keyboard.
 On a fresh Omarchy install:
 
 ```bash
-git clone <this repo> ~/macbook-touchbar-omarchy
-cd ~/macbook-touchbar-omarchy
+git clone https://github.com/seatrips/omarchy-macbook-touchbar.git ~/omarchy-macbook-touchbar
+cd ~/omarchy-macbook-touchbar
 ./install.sh
 ```
 
