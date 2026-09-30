@@ -17,3 +17,12 @@ AttrPalmSizeThreshold=900
 MatchUdevType=keyboard
 MatchName=keyd virtual keyboard
 AttrKeyboardIntegration=internal
+
+# The applespi keyboard reports vendor 0x0000, so libinput's own "Apple Internal Keyboard (SPI)"
+# quirk (vendor 0x05AC) never matches it. Mark it internal so it pairs with the touchpad for
+# disable-while-typing when keyd is not in use (the default with the real Touch Bar driver).
+[Apple SPI keyboard (applespi) - internal for disable-while-typing]
+MatchUdevType=keyboard
+MatchBus=spi
+MatchName=Apple SPI Keyboard
+AttrKeyboardIntegration=internal
