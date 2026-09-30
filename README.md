@@ -1,185 +1,211 @@
-# MacBook Pro Touch Bar on Linux: get Esc, F1–F12, volume and brightness back (Omarchy / Hyprland / Arch)
+# MacBook Pro T1 Touch Bar on Linux: working Touch Bar, Fn keys and touchpad (Omarchy / Hyprland / Arch)
 
-> **This does not make the Touch Bar light up.** It stays blank. This guide puts the keys the Touch Bar would give you on the physical keyboard instead: **Caps Lock + Tab** for Esc, and **Fn + number row / arrows** for F1–F12, volume and brightness. It also tunes the touchpad so it stops clicking by itself.
+A complete, tested walkthrough for the **2016–2017 Touch Bar MacBook Pro** (T1 chip) on Linux: bring a **dead, black Touch Bar** back (even after Linux wiped macOS), get **Esc, F1–F12, volume and brightness** on it, and set up the keyboard and touchpad for **[Omarchy](https://omarchy.org)** (Arch Linux + Hyprland).
 
-Tested on a **MacBook Pro 14,3** (15-inch, 2017, Touch Bar, T1 chip) running **[Omarchy](https://omarchy.org) 4** (Arch Linux + Hyprland), kernel 7.2, keyd 2.6. It should work the same on the other 2016–2017 Touch Bar models, which use the same `applespi` keyboard and touchpad driver. One command installs it all, and every change is explained below so you can also apply it by hand on another distro.
+Done on a **MacBook Pro 14,3** (15-inch, 2017) with a full-disk Omarchy 4 install, kernel 7.2. Result: Touch Bar lit with Esc and media keys, **hold Fn for F1–F12**, FaceTime camera working. The Touch Bar driver and T1 recovery come from other people's projects (credited below); this repo ties them together and adds the Omarchy side.
 
-**Contents:** [Is this for me?](#is-this-for-me) · [What you get](#what-you-get) · [Install](#install) · [How it works](#how-it-works) · [Manual install / other distros](#manual-install-and-other-distros) · [Checking it works](#checking-it-works) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall) · [FAQ](#faq) · [Optional extras](#optional-extras)
+**Contents:** [Is this for me?](#is-this-for-me) · [How the T1 works](#how-the-t1-works-and-why-the-touch-bar-goes-black) · [Step 1: back up](#step-1-back-up-the-t1-firmware) · [Step 2: revive the T1](#step-2-revive-the-t1-if-its-in-recovery-mode) · [Step 3: Touch Bar driver](#step-3-install-a-touch-bar-driver) · [Step 4: Omarchy settings](#step-4-omarchy-keyboard-and-touchpad-settings) · [What works](#what-works-now) · [Troubleshooting](#troubleshooting) · [keyd fallback](#fallback-no-touch-bar-keys-on-the-keyboard-instead) · [FAQ](#faq) · [Optional extras](#optional-extras) · [Credits](#credits)
 
 ## Is this for me?
 
-You're in the right place if you installed Linux on a Touch Bar MacBook Pro and:
+You're in the right place if you run Linux on a Touch Bar MacBook Pro and:
 
 - the **Touch Bar is black** / blank / does nothing,
-- you have **no Esc key**, no F1–F12, and no volume or brightness keys,
-- the **Fn key does nothing** on its own and can't be bound in Hyprland (or any other desktop),
-- Caps Lock types odd characters like `ﬀ` instead of capitals (that's Omarchy's Compose key),
-- the touchpad **clicks or starts selections by itself** while you type or rest your hand on it.
+- you have **no Esc key**, no F1–F12, no volume or brightness keys,
+- the FaceTime **camera is missing**,
+- `lsusb` shows **`05ac:1281 Apple, Inc. Mobile Device (Recovery Mode)`**,
+- or the touchpad **clicks and starts selections by itself**.
 
-Check your model:
+Check your model and the T1's state:
 
 ```bash
-cat /sys/class/dmi/id/product_name
+cat /sys/class/dmi/id/product_name       # which Mac
+lsusb | grep -i 05ac                     # 8600 = T1 running, 1281 = T1 in recovery mode
 ```
 
-| Model identifier | Mac | Touch Bar | Covered |
-|---|---|---|---|
-| MacBookPro13,2 | 13-inch, 2016, four Thunderbolt 3 ports (A1706) | Yes | Should work (same driver), untested |
-| MacBookPro13,3 | 15-inch, 2016 (A1707) | Yes | Should work (same driver), untested |
-| MacBookPro14,2 | 13-inch, 2017, four Thunderbolt 3 ports (A1706) | Yes | Should work (same driver), untested |
-| **MacBookPro14,3** | **15-inch, 2017 (A1707)** | **Yes** | **Tested** |
-| MacBookPro13,1 / 14,1 | 13-inch, two ports, real function keys (A1708) | No | You don't need the Fn layer; the touchpad part still applies |
-| 2018 and later (T2 chip) | | Yes | **No.** These use a different keyboard driver; see [t2linux.org](https://wiki.t2linux.org) |
+| Model identifier | Mac | This guide |
+|---|---|---|
+| MacBookPro13,2 | 13-inch 2016, four Thunderbolt 3 ports (A1706) | Yes (T1). Tested by the projects linked below. |
+| MacBookPro13,3 | 15-inch 2016 (A1707) | Yes (T1). Tested by the projects linked below. |
+| MacBookPro14,2 | 13-inch 2017, four Thunderbolt 3 ports (A1706) | Yes (T1). Tested by the projects linked below. |
+| **MacBookPro14,3** | **15-inch 2017 (A1707)** | **Yes (T1). Tested here, end to end.** |
+| MacBookPro13,1 / 14,1 | 13-inch, two ports, physical F-keys (A1708) | No Touch Bar. Only [Step 4](#step-4-omarchy-keyboard-and-touchpad-settings) applies. |
+| MacBookPro15,x and later | 2018+ (T2 chip) | **No.** Different chip; see [t2linux.org](https://wiki.t2linux.org). T2 guides don't work on T1 either. |
 
-Confirm the driver with `lsmod | grep applespi`. If that prints nothing, this setup won't do anything on your machine.
+## How the T1 works (and why the Touch Bar goes black)
 
-## What you get
+The Touch Bar, FaceTime camera, ambient light sensor and Touch ID all hang off the **T1**, a small ARM chip that shows up to Linux as a USB device. The T1 has **no firmware of its own**: at power-on, the Mac's boot firmware loads it from the EFI System Partition, `EFI/APPLE/EMBEDDEDOS/` (about 30 MB, personalised to your chip).
 
-### Keyboard
+Most Linux installers recreate the EFI partition, which **erases that folder**. The T1 then has nothing to boot and falls back to **recovery mode** (`05ac:1281`). The Touch Bar goes black and the camera disappears, and no driver can help, because the chip isn't running. That's what happened here.
 
-| Keys | Does |
+So there are two separate problems:
+
+1. **Is the T1 running?** `05ac:8600` = yes, go to Step 3. `05ac:1281` = no, do Step 2 first.
+2. **Does Linux drive the Touch Bar?** That needs a driver (Step 3). Without one, even a running T1 shows a black or static bar.
+
+## Step 1: back up the T1 firmware
+
+If `EFI/APPLE` still exists on your disk (macOS still installed, or you haven't reinstalled yet), **copy it somewhere off this disk first**: a USB stick, another computer, cloud storage. With a backup, a wiped EFI partition later is a 5-second file copy. Without one, you depend on Apple still signing this firmware (Step 2).
+
+```bash
+git clone https://github.com/creolben/macbook-t1-touchbar ~/macbook-t1-touchbar
+sudo ~/macbook-t1-touchbar/standalone/t1-touchbar.sh backup-firmware
+```
+
+Already revived with Step 2? Back up right after that too; `t1-revive backup --to <path>` does the same.
+
+## Step 2: revive the T1 (if it's in recovery mode)
+
+Only needed if `lsusb` shows `05ac:1281`. **[niconistal/t1-revive](https://github.com/niconistal/t1-revive)** rebuilds the T1 firmware **from Linux alone, without macOS**: it drives Apple's own restore protocol, lets the chip fetch its Apple-signed data from Apple's servers, boots the T1 and puts the files back on the EFI partition so the Mac loads them at every boot.
+
+```bash
+git clone https://github.com/niconistal/t1-revive ~/t1-revive && cd ~/t1-revive
+bash build.sh                              # builds patched libimobiledevice tools into prefix/
+sudo bin/t1-revive preflight               # read-only checks, installs acpi_call-dkms and headers
+sudo bin/t1-revive regenerate              # about 5 minutes, asks before each device step
+```
+
+**Read its README before running it.** It writes to the T1 and needs mains power, a network connection to Apple and you at the keyboard. If a step fails: shut down fully, wait 20 seconds, power on and run `sudo bin/t1-revive regenerate --from <step>`.
+
+Afterwards `lsusb` shows `05ac:8600 iBridge`, and it stays that way across reboots (confirmed here: the first boot after the revive enumerated `8600` straight away). The camera works right away (`uvcvideo`); the Touch Bar needs Step 3. **Now do Step 1** if you couldn't before.
+
+## Step 3: install a Touch Bar driver
+
+There are two drivers. They **conflict**, so pick one:
+
+| | [t1bridge](https://github.com/standardagents/t1bridge) | [macbook-t1-touchbar](https://github.com/creolben/macbook-t1-touchbar) (used here) |
+|---|---|---|
+| Touch Bar | ✅ own renderer | ✅ Esc + media keys, Fn = F1–F12 |
+| Camera | ✅ | ✅ (plain `uvcvideo`) |
+| **Touch ID** | ✅ via `fprintd` | ❌ |
+| What it is | Full T1 stack, signed Arch packages | Ronald Tschalär's `apple-ibridge` kernel driver, patched for current kernels, via DKMS |
+| Size | Larger, third-party package repo | Small, three kernel modules + one boot service |
+
+**Want Touch ID? Use t1bridge**; t1-revive's [docs/omarchy.md](https://github.com/niconistal/t1-revive/blob/main/docs/omarchy.md) covers the Omarchy details (firewall rule, PAM lines). The rest of this section is the small driver this machine uses:
+
+```bash
+cd ~/macbook-t1-touchbar/standalone
+./t1-touchbar.sh status                    # read-only: firmware, USB, HID, driver, DKMS
+sudo ./bootstrap-t1-touchbar.sh            # prerequisites, patch + build, DKMS, boot service, initramfs
+./t1-touchbar.sh audit-boot                # will it come up by itself after a reboot?
+```
+
+What ends up on the system (copies of this machine's files are in [`touchbar/`](touchbar/)):
+
+| File | Purpose |
 |---|---|
-| **Fn + 1 … 0, -, =** | F1 … F12 |
-| **Fn + ↑ / ↓** | Volume up / down |
-| **Fn + → / ←** | Screen brightness up / down |
-| **Fn + Backspace** | Forward Delete |
-| **Caps Lock + Tab** | Esc |
-| **Caps Lock** (tap) | Normal Caps Lock (no more Compose) |
-| **§ / ±** | The key left of 1 on ISO (European) keyboards |
+| DKMS module `appleibridge` | `apple-ibridge`, `apple-ib-tb`, `apple-ib-als`; rebuilt automatically on kernel updates. The patch only adapts three functions to kernel API changes (`report_fixup` returns `const`, `platform_driver.remove` returns `void`, no `.owner` on ACPI drivers). |
+| `/etc/modules-load.d/apple-touchbar.conf` | Loads the driver at boot. |
+| `/etc/modprobe.d/apple-ib-tb.conf` | `options apple-ib-tb fnmode=1`: the bar shows Esc + brightness/volume/media, **hold Fn for F1–F12**. `fnmode=2` flips that; `0` = F-keys only; `3` = media keys only. |
+| `/etc/modprobe.d/apple-ib-als.conf` | `blacklist apple-ib-als`: the light-sensor module can fail to load (see [FAQ](#faq)). |
+| `apple-touchbar.service` + `/usr/local/sbin/apple-touchbar-handover` | At boot, `hid-sensor-hub` grabs the Touch Bar's HID interface first. This moves it to `apple-ibridge-hid`, otherwise the bar stays dark while `lsmod` looks fine. |
 
-**Right Option** works the same as Fn (see [Trade-offs](#trade-offs-and-gotchas)).
+> **Known issue in the handover script** (found here): it checks for a hard-coded `0003:05AC:8600.0001`, but after a T1 revive the devices are numbered `.0002`/`.0003`, so it exits "T1 not ready" and the bar stays dark. Fix in `/usr/local/sbin/apple-touchbar-handover`: replace `if [[ ! -e /sys/bus/hid/devices/0003:${VIDPID}.0001 ]]; then` with `if [[ ! -e $1 ]]; then`.
 
-### Touchpad
+**Important for anyone coming from the keyd fallback:** the Touch Bar driver switches to F1–F12 when it sees the real **Fn** key. The fallback remaps Fn to Right Alt, so remove it; see [Moving from the keyd fallback](#moving-from-the-keyd-fallback-to-the-real-touch-bar).
 
-| Gesture | Does |
-|---|---|
-| **4-finger swipe left / right** | Switch workspace |
-| **2-finger scroll** | macOS-style "natural" scrolling |
-| **2-finger tap** | Right click |
-| **3-finger tap** | Middle click |
-| **Firm click and drag** | Select text / drag windows |
+## Step 4: Omarchy keyboard and touchpad settings
 
-Light brushes and resting palms are ignored, the touchpad pauses while you type, and tap-and-drag and three-finger drag are off, because they kept starting selections by themselves.
-
-## Install
-
-On a fresh Omarchy install, one command sets up everything:
+These make the keyboard and touchpad behave on Omarchy. They're useful with or without a working Touch Bar.
 
 ```bash
-git clone https://github.com/seatrips/omarchy-macbook-touchbar-workaround.git ~/omarchy-macbook-touchbar-workaround && ~/omarchy-macbook-touchbar-workaround/install.sh
+git clone https://github.com/seatrips/macbook-pro-t1-touchbar-linux.git ~/macbook-pro-t1-touchbar-linux && ~/macbook-pro-t1-touchbar-linux/install.sh
 ```
 
-Already cloned it? Update and re-apply with:
-
-```bash
-cd ~/omarchy-macbook-touchbar-workaround && git pull && ./install.sh
-```
-
-What the script does:
-
-1. Copies the Hyprland and keyboard-layout files to `~/.config` and adds one `require("hypr.macbook")` line to `~/.config/hypr/input.lua`.
-2. Installs `keyd` if it's missing, and copies its config plus the driver and touchpad settings to `/etc` (asks for your sudo password).
-3. Rebuilds the initramfs (`limine-mkinitcpio`), so the Fn remap survives a reboot.
-4. Turns on the Fn remap right away and starts keyd.
-
-Every file it replaces is backed up to `<file>.bak.<timestamp>` first, so it's safe to run again. The keyboard works straight away. **Log out and back in once** for the touchpad settings. A reboot is not required, but it's the best test that everything sticks.
-
-## How it works
-
-The Touch Bar is a separate little computer (the T1 chip) that Linux has no working driver for here, so it never shows any keys. The physical keyboard is fine, but its **Fn key is handled inside the `applespi` driver** and never reaches the desktop, so you can't bind anything to it. The fix has three parts:
-
-1. **Make Fn visible.** The `applespi` driver has a `fnremap` option. `fnremap=7` makes Fn send **Right Alt** (Right Option), a normal key that other programs can see.
-2. **Turn Fn into a layer.** [keyd](https://github.com/rvaiya/keyd) is a system-wide key remapper that works below Wayland/X11. It treats Right Alt as a layer key: while it's held, the number row becomes F1–F12 and the arrows become volume and brightness. Caps Lock becomes a layer too, which gives Caps + Tab = Esc while a tap still toggles Caps Lock.
-3. **Tame the touchpad.** A libinput quirks file raises the minimum contact size for a touch and lowers the palm threshold, and Hyprland settings turn off the drag features that misfire.
+Update later with `cd ~/macbook-pro-t1-touchbar-linux && git pull && ./install.sh`. Every replaced file is backed up to `<file>.bak.<timestamp>`. **Log out and back in once** afterwards.
 
 | File in this repo | Installed to | Purpose |
 |---|---|---|
-| [`etc/modprobe.d/applespi.conf`](etc/modprobe.d/applespi.conf) | `/etc/modprobe.d/` | `options applespi fnremap=7`: Fn sends Right Alt. Omarchy loads this driver from the initramfs, so the initramfs must be rebuilt or the option is ignored after a reboot. |
-| [`etc/keyd/default.conf`](etc/keyd/default.conf) | `/etc/keyd/` | The "fn" layer (F-keys, volume, brightness, Delete) and the "caps" layer (Caps + Tab = Esc). Edit this file to change what Fn does, then `sudo keyd reload`. |
-| [`etc/modprobe.d/hid_apple.conf`](etc/modprobe.d/hid_apple.conf) | `/etc/modprobe.d/` | `fnmode=2`: F-keys first on *external* Apple keyboards. Doesn't affect the built-in one. |
-| [`etc/libinput/local-overrides.quirks`](etc/libinput/local-overrides.quirks) | `/etc/libinput/` | `AttrTouchSizeRange=300:250` (default 150:130): a contact must be bigger to count as a touch. `AttrPalmSizeThreshold=900` (default 1600): big contacts count as a palm sooner. `AttrKeyboardIntegration=internal` for keyd's virtual keyboard: keyd re-sends every keystroke from a virtual *USB* keyboard, so without this libinput thinks you're typing on an external keyboard and never pauses the touchpad. |
+| [`config/hypr/macbook.lua`](config/hypr/macbook.lua) | `~/.config/hypr/` | `usmac` layout, **Compose key off** (Omarchy makes Caps Lock a Compose key; this gives you a normal Caps Lock), natural scrolling, 2-finger tap = right click, 3-finger tap = middle click, 4-finger swipe = switch workspace, tap-and-drag / drag lock / three-finger drag off (they started selections by themselves). `install.sh` adds `require("hypr.macbook")` to `input.lua`. |
 | [`config/xkb/symbols/usmac`](config/xkb/symbols/usmac) | `~/.config/xkb/symbols/` | US layout plus § / ± on the extra ISO key. |
-| [`config/hypr/macbook.lua`](config/hypr/macbook.lua) | `~/.config/hypr/` | Hyprland (Lua config): `usmac` layout, Compose key off, natural scrolling, tap button map, 4-finger workspace swipe, tap-and-drag / drag lock / three-finger drag off. |
+| [`etc/libinput/local-overrides.quirks`](etc/libinput/local-overrides.quirks) | `/etc/libinput/` | Fewer accidental taps: a contact must be bigger to count as a touch (`AttrTouchSizeRange=300:250`, default 150:130) and big contacts count as a palm sooner (`AttrPalmSizeThreshold=900`, default 1600). Raise the numbers if taps still happen by accident, lower them if real taps get missed. The second section only matters with the keyd fallback. |
+| [`etc/modprobe.d/hid_apple.conf`](etc/modprobe.d/hid_apple.conf) | `/etc/modprobe.d/` | `fnmode=2`: F-keys first on *external* Apple keyboards. |
 
-## Trade-offs and gotchas
+## What works now
 
-- **Right Option is taken.** The driver can only remap Fn to a key the MacBook already has. Right Option is the least used, so it doubles as Fn.
-- **No Page Up / Page Down / Home / End.** Fn + arrows normally give those; here they're volume and brightness. Change the `[fn]` section in `/etc/keyd/default.conf` if you'd rather have them (e.g. `up = pageup`).
-- **No Compose key.** Omarchy normally makes Caps Lock a Compose key; that's switched off so Caps Lock gives capitals.
-- **No 3-finger swipes.** They never reached Hyprland on this touchpad, so the workspace swipe uses 4 fingers.
-- **Selecting needs a firm click.** The Force Touch pad only clicks on a firm press. With tap-and-drag off, press, hold and drag.
-- **Right click pastes inside Claude Code.** That's Claude Code's own behavior, not the touchpad. Everywhere else a right click is a normal right click.
+| Hardware | Status | How |
+|---|---|---|
+| Touch Bar | ✅ | Esc, brightness, volume, media; **hold Fn = F1–F12**; dims after 5 minutes idle |
+| Keyboard | ✅ | In-kernel `applespi`. **Fn + ↑/↓ = Page Up/Down, Fn + ←/→ = Home/End, Fn + Backspace = Delete** |
+| Touchpad | ✅ | In-kernel `applespi` + Step 4 |
+| FaceTime camera | ✅ | `uvcvideo` on the T1 (`/dev/video0`) |
+| Wi-Fi (BCM43602) | ⚠️ | Works, weak signal; see [Wi-Fi fix](#optional-fix-weak-wi-fi-signal) |
+| USB-C Ethernet adapter | ✅ | Out of the box (`cdc_ncm`, 1 Gbit/s) |
+| Ambient light sensor | 🔧 | Being worked on; see [FAQ](#faq) |
+| Touch ID | ❌ with this driver | ✅ with [t1bridge](https://github.com/standardagents/t1bridge) instead |
 
-## Manual install and other distros
-
-The keyboard part isn't Omarchy-specific: `fnremap` + keyd work on any distro and any desktop (GNOME, KDE, Sway, X11), because keyd runs below all of them.
-
-```bash
-# 1. Fn -> Right Alt, now and on every boot
-echo 'options applespi fnremap=7' | sudo tee /etc/modprobe.d/applespi.conf
-echo 7 | sudo tee /sys/module/applespi/parameters/fnremap
-sudo mkinitcpio -P            # Omarchy/Limine: sudo limine-mkinitcpio
-                              # Debian/Ubuntu: sudo update-initramfs -u
-                              # Fedora: sudo dracut --force
-
-# 2. keyd with the Fn and Caps layers
-sudo pacman -S keyd           # or your distro's package / build from source
-sudo install -Dm644 etc/keyd/default.conf /etc/keyd/default.conf
-sudo systemctl enable --now keyd
-
-# 3. Touchpad quirks (log out and back in afterwards)
-sudo install -Dm644 etc/libinput/local-overrides.quirks /etc/libinput/local-overrides.quirks
-```
-
-On a non-Omarchy Hyprland setup, copy the settings you want from [`config/hypr/macbook.lua`](config/hypr/macbook.lua) into your own config. On GNOME or KDE, set natural scrolling and tap-to-click in their settings apps instead.
-
-## Checking it works
-
-- `cat /sys/module/applespi/parameters/fnremap` prints `7`.
-- `systemctl is-active keyd` prints `active`.
-- `sudo keyd monitor`, then press Fn: it should show `rightalt`. (Ctrl + C to quit.)
-- In a browser, **Fn + 5** (F5) reloads the page, and **Fn + ↑** raises the volume.
-- `hyprctl configerrors` prints nothing.
+Check the Touch Bar stack at any time with `~/macbook-t1-touchbar/standalone/t1-touchbar.sh status`.
 
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
-| Fn keys worked, then stopped after a reboot; `fnremap` prints `0` | The initramfs wasn't rebuilt, so the driver loaded without the option. Run `sudo limine-mkinitcpio` (or `sudo mkinitcpio -P`) and reboot. |
-| Fn does nothing, `fnremap` is `7` | keyd isn't running: `sudo systemctl enable --now keyd`, then check `journalctl -u keyd` for config errors. |
-| Caps Lock gives `ﬀ`, `æ` or other odd characters | The Compose key is still on: make sure `~/.config/hypr/input.lua` contains `require("hypr.macbook")` and run `hyprctl reload`. |
-| Touchpad still clicks by accident | Log out and in (quirks only load then). Still too sensitive? Raise `AttrTouchSizeRange` (e.g. `350:300`) and lower `AttrPalmSizeThreshold` (e.g. `800`). |
-| Real taps get missed | Lower `AttrTouchSizeRange` a step (e.g. `250:210`), then log out and in. |
-| Touchpad reacts while typing | Check the quirk is applied: `sudo libinput quirks list /dev/input/eventN` for keyd's virtual keyboard (find N with `sudo libinput list-devices`) should show `AttrKeyboardIntegration=internal`. |
-| `hyprctl configerrors` shows errors | Your Omarchy may be older than 4 (the config is Lua). Copy the settings into your `.conf` files by hand. |
+| Touch Bar black, `lsusb` shows `05ac:1281` | The T1 has no firmware: [Step 2](#step-2-revive-the-t1-if-its-in-recovery-mode), or restore your backup with `t1-touchbar.sh restore-firmware`. |
+| Touch Bar black, T1 is `05ac:8600`, `lsmod` shows `apple_ib_tb` | The HID interface is still held by `hid-sensor-hub`. `systemctl status apple-touchbar.service`; if it says "T1 not ready?", apply the [handover fix](#step-3-install-a-touch-bar-driver). |
+| Holding Fn doesn't switch the bar to F1–F12 | Fn is still remapped: `cat /sys/module/applespi/parameters/fnremap` must print `0`. Remove the keyd fallback. |
+| Everything stopped after a kernel update | DKMS didn't rebuild: `dkms status`, then `sudo dkms autoinstall` and reboot. |
+| Two DKMS packages claim the same modules | Older AUR packages (`macbook12-spi-driver-dkms`) ship the same module names: `sudo ~/macbook-t1-touchbar/standalone/resolve-dkms-conflict.sh`. |
+| Caps Lock gives `ﬀ`, `æ` or other odd characters | Compose is still on: check `require("hypr.macbook")` is in `~/.config/hypr/input.lua`, then `hyprctl reload`. |
+| Touchpad clicks by accident / misses taps | Adjust `AttrTouchSizeRange` up / down, then log out and in. |
+
+## Fallback: no Touch Bar? Keys on the keyboard instead
+
+If you can't revive the T1 (or don't want to touch its firmware), this puts the missing keys on the physical keyboard with [keyd](https://github.com/rvaiya/keyd):
+
+```bash
+~/macbook-pro-t1-touchbar-linux/install.sh --keyd-fallback
+```
+
+| Keys | Does |
+|---|---|
+| Fn + 1 … 0, -, = | F1 … F12 |
+| Fn + ↑ / ↓ | Volume |
+| Fn + → / ← | Brightness |
+| Fn + Backspace | Delete |
+| Caps Lock + Tab | Esc |
+
+How: `applespi fnremap=7` ([`fallback/etc/modprobe.d/applespi.conf`](fallback/etc/modprobe.d/applespi.conf)) makes Fn send Right Alt so it's visible at all, and keyd ([`fallback/etc/keyd/default.conf`](fallback/etc/keyd/default.conf)) turns that into a layer. Omarchy loads `applespi` from the initramfs, so the script rebuilds it (`limine-mkinitcpio`). Trade-offs: Right Option doubles as Fn, and there's no Page Up/Down/Home/End. The libinput quirks' second section is needed with this, because keyd re-sends keys from a virtual *USB* keyboard and libinput would otherwise not pause the touchpad while you type.
+
+### Moving from the keyd fallback to the real Touch Bar
+
+```bash
+sudo rm /etc/modprobe.d/applespi.conf
+echo 0 | sudo tee /sys/module/applespi/parameters/fnremap
+sudo systemctl disable --now keyd
+sudo limine-mkinitcpio          # or: sudo mkinitcpio -P
+```
+
+Fn is a real Fn key again: holding it switches the Touch Bar to F1–F12, and Right Option is a normal key.
 
 ## Uninstall
 
+Step 4 settings:
+
 ```bash
-sudo systemctl disable --now keyd
-sudo rm /etc/keyd/default.conf /etc/modprobe.d/applespi.conf /etc/modprobe.d/hid_apple.conf /etc/libinput/local-overrides.quirks
-sudo limine-mkinitcpio        # or: sudo mkinitcpio -P
+sudo rm /etc/modprobe.d/hid_apple.conf /etc/libinput/local-overrides.quirks
 rm ~/.config/hypr/macbook.lua ~/.config/xkb/symbols/usmac
 sed -i '/hypr.macbook/d;/MacBook Pro Touch Bar keyboard/d' ~/.config/hypr/input.lua
 ```
 
-Then reboot. The `*.bak.<timestamp>` files next to each installed file are the versions from before the first install, if you want to restore those.
+The Touch Bar driver: `sudo systemctl disable apple-touchbar.service`, `sudo dkms remove appleibridge/0.1 --all`, remove the files listed in Step 3, rebuild the initramfs and reboot. The `*.bak.<timestamp>` files are the versions from before the first install.
 
 ## FAQ
 
-**Can the Touch Bar itself be made to work?** On the 2016–2017 (T1) models there is an out-of-tree driver: [nohzafk/omarchy-macbookpro-t1](https://github.com/nohzafk/omarchy-macbookpro-t1). It needs the T1's firmware, which comes from macOS. If you installed Linux over the whole disk and wiped macOS, the T1 sits in recovery mode (`05ac:1281` in `lsusb`), and you'd have to reinstall macOS and then install Linux next to it. This guide is for everyone who doesn't want to do that.
+**Does this need macOS?** No. t1-revive regenerates the T1 firmware from Linux. It does need Apple's signing servers once, which is why the off-disk backup (Step 1) matters: if Apple ever stops signing this firmware, a backup is the only way back.
 
-**Why keyd and not Hyprland keybindings?** Hyprland can't see Fn at all, and a keyd layer makes F1–F12 real F-keys that every program (and the Linux console) understands, instead of shortcuts that only exist inside Hyprland.
+**Does the T1 talk to Apple at every boot?** No. It boots from the files on the EFI partition, offline, about a second after power-on.
 
-**Will an Omarchy update undo this?** No. Everything lives in `/etc` and in your own `~/.config/hypr`, which Omarchy updates don't overwrite. A kernel update rebuilds the initramfs with the `/etc/modprobe.d` file included.
+**Can I get Touch ID / the fingerprint reader?** Yes, but only with [t1bridge](https://github.com/standardagents/t1bridge), which replaces the driver used here. It provides `fprintd` support for sudo, polkit and the lock screen. The driver in Step 3 can't: it has no code for the T1's Secure Enclave.
 
-**Do USB-C docks and adapters work?** Yes, as far as tested: a USB-C Ethernet adapter (`cdc_ncm` driver) worked out of the box at 1 Gbit/s, and NetworkManager preferred it over Wi-Fi automatically.
+**What about the ambient light sensor?** It sits on the same T1 interface as the Touch Bar, so once the handover moves that interface to `apple-ibridge`, the generic `hid-sensor-als` can't reach it and only `apple-ib-als` can. That module fails to load with `Unknown symbol iio_triggered_buffer_setup_ext` unless `industrialio-triggered-buffer` is loaded first, which is why it's blacklisted by default. Being worked on in this repo.
 
-**Is the built-in Wi-Fi really that bad?** On the 14,2 and 14,3 it can be; see the [Wi-Fi fix](#optional-fix-weak-wi-fi-signal) below.
+**Will an Omarchy update undo this?** No. The driver is DKMS (rebuilt for each kernel), the configs live in `/etc` and in your own `~/.config/hypr`.
+
+**Why did my installer wipe the T1 firmware?** A "use the whole disk" install recreates the EFI partition, and `EFI/APPLE` goes with it. Next time, keep that folder (or install next to macOS) and Step 2 is never needed.
 
 ## Optional extras
 
-These aren't needed for the keyboard and touchpad, and `install.sh` doesn't do them.
+These aren't needed for the Touch Bar, keyboard or touchpad, and `install.sh` doesn't do them.
 
 ### Optional: stop Bluetooth auto-accepting pairings
 
@@ -237,7 +263,7 @@ This isn't specific to MacBooks, and `install.sh` doesn't do it. It's for when y
 Install it with:
 
 ```bash
-cd ~/omarchy-macbook-touchbar-workaround && ./security/install.sh
+cd ~/macbook-pro-t1-touchbar-linux && ./security/install.sh
 sudo systemctl start security-watch   # first check now instead of waiting a day
 ```
 
@@ -254,3 +280,13 @@ Then open OpenSnitch's preferences (the tray icon) and set the popup's **default
 
 If a notification turns out to be a false positive on your machine, add it to `/etc/rkhunter.conf.local` (for rkhunter) or `/etc/lynis/custom.prf` (`skip-test=<ID>`, for lynis). To undo: `sudo systemctl disable --now security-watch.timer opensnitchd`, remove the `opensnitch-ui` line from `~/.config/hypr/autostart.lua`, and remove the files listed above.
 
+
+## Credits
+
+- **Ronald Tschalär** ([roadrunner2/macbook12-spi-driver](https://github.com/roadrunner2/macbook12-spi-driver)): the `apple-ibridge` / `apple-ib-tb` / `apple-ib-als` drivers, and `applespi`, now in the mainline kernel.
+- **[niconistal/t1-revive](https://github.com/niconistal/t1-revive)**: reviving a T1 in recovery mode from Linux, without macOS.
+- **[creolben/macbook-t1-touchbar](https://github.com/creolben/macbook-t1-touchbar)**: the patched driver build, DKMS setup, boot-time interface handover, firmware backup and diagnostics.
+- **[standardagents/t1bridge](https://github.com/standardagents/t1bridge)**: the full T1 stack with Touch ID.
+- **[rvaiya/keyd](https://github.com/rvaiya/keyd)**: the key remapper behind the fallback.
+
+Found a mistake or got it working on another model? Open an issue.
