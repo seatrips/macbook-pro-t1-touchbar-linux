@@ -7,8 +7,8 @@
 MatchUdevType=touchpad
 MatchBus=spi
 MatchVendor=0x06CB
-AttrTouchSizeRange=350:300
-AttrPalmSizeThreshold=800
+AttrTouchSizeRange=300:250
+AttrPalmSizeThreshold=900
 
 # keyd re-sends every keystroke through its own virtual keyboard (USB bus), so libinput
 # treats it as external and never pauses the touchpad while typing. Mark it internal so

@@ -13,3 +13,9 @@ hl.config({ input = { touchpad = { tap_to_click = true, tap_button_map = "lrm" }
 
 -- macOS-style natural scrolling: content moves with your fingers.
 hl.config({ input = { touchpad = { natural_scroll = true } } })
+
+-- Select/drag without pressing hard (the Force Touch pad only "clicks" on a firm press):
+--   * tap, then touch again and slide = drag/select (tap-and-drag, on by default);
+--     drag_lock keeps the drag going if the finger lifts for a moment.
+--   * or slide with three fingers = drag/select (macOS-style three-finger drag).
+hl.config({ input = { touchpad = { tap_and_drag = true, drag_lock = 1, drag_3fg = 1 } } })

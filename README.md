@@ -34,8 +34,10 @@ This setup puts all those missing keys on the physical keyboard.
 | **2-finger scroll** | macOS-style "natural" scrolling |
 | **2-finger tap** | Right click |
 | **3-finger tap** | Middle click |
+| **3-finger slide** | Select / drag, no hard press needed (macOS-style three-finger drag) |
+| **Tap, then touch again and slide** | Select / drag (a short lift doesn't drop it) |
 
-Light brushes and resting palms are ignored, so tapping causes fewer accidental clicks.
+Light brushes and resting palms are ignored, so tapping causes fewer accidental clicks. The Force Touch pad only clicks on a firm press, which is why selecting works with taps and three fingers instead.
 
 ## Install
 
@@ -60,7 +62,7 @@ The script asks for your sudo password for the system files. It backs up every f
 | `etc/modprobe.d/applespi.conf` | `/etc/modprobe.d/` | `fnremap=7` tells the keyboard driver to make **Fn** send **Right Alt**, so keyd can see it. Omarchy loads this driver from the initramfs, so `install.sh` rebuilds it (`limine-mkinitcpio`). Otherwise the setting is lost on reboot. |
 | `etc/keyd/default.conf` | `/etc/keyd/` | [keyd](https://github.com/rvaiya/keyd) turns Right Alt (= Fn) into an "fn" layer (F-keys, volume, brightness, Delete), and holding Caps Lock into a "caps" layer (Caps+Tab = Esc). |
 | `etc/modprobe.d/hid_apple.conf` | `/etc/modprobe.d/` | `fnmode=2` makes F-keys come first on external Apple keyboards. It doesn't affect the built-in keyboard. |
-| `etc/libinput/local-overrides.quirks` | `/etc/libinput/` | Touchpad driver tweak: a contact has to be bigger before it counts as a touch (`AttrTouchSizeRange=350:300`, default 150:130), and large contacts are treated as palms sooner (`AttrPalmSizeThreshold=800`, default 1600). Fewer accidental taps. Raise the numbers if taps still happen by accident, lower them if real taps get missed. It also marks keyd's virtual keyboard as internal (`AttrKeyboardIntegration=internal`): keyd re-sends every keystroke from a virtual USB keyboard, so without this libinput never pauses the touchpad while you type. |
+| `etc/libinput/local-overrides.quirks` | `/etc/libinput/` | Touchpad driver tweak: a contact has to be bigger before it counts as a touch (`AttrTouchSizeRange=300:250`, default 150:130), and large contacts are treated as palms sooner (`AttrPalmSizeThreshold=900`, default 1600). Fewer accidental taps. Raise the numbers if taps still happen by accident, lower them if real taps get missed. It also marks keyd's virtual keyboard as internal (`AttrKeyboardIntegration=internal`): keyd re-sends every keystroke from a virtual USB keyboard, so without this libinput never pauses the touchpad while you type. |
 | `config/xkb/symbols/usmac` | `~/.config/xkb/symbols/` | US layout plus § / ± on the extra ISO key. |
 | `config/hypr/macbook.lua` | `~/.config/hypr/` | Hyprland: `usmac` layout, **no Compose key** on Caps Lock (Omarchy's default), touchpad gestures, tap and scroll settings. `install.sh` adds `require("hypr.macbook")` to `~/.config/hypr/input.lua`. |
 
