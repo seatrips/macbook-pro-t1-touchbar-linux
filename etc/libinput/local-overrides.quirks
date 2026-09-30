@@ -9,3 +9,11 @@ MatchBus=spi
 MatchVendor=0x06CB
 AttrTouchSizeRange=350:300
 AttrPalmSizeThreshold=800
+
+# keyd re-sends every keystroke through its own virtual keyboard (USB bus), so libinput
+# treats it as external and never pauses the touchpad while typing. Mark it internal so
+# disable-while-typing works again.
+[keyd virtual keyboard - internal for disable-while-typing]
+MatchUdevType=keyboard
+MatchName=keyd virtual keyboard
+AttrKeyboardIntegration=internal
