@@ -2,6 +2,8 @@
 
 A complete, tested walkthrough for the **2016–2017 Touch Bar MacBook Pro** (T1 chip) on Linux: bring a **dead, black Touch Bar** back (even after Linux wiped macOS), get **Esc, F1–F12, volume and brightness** on it, and set up the keyboard and touchpad for **[Omarchy](https://omarchy.org)** (Arch Linux + Hyprland).
 
+Don't want the Touch Bar at all? There's a [keyboard-only fallback](#fallback-no-touch-bar-keys-on-the-keyboard-instead) that puts Esc and F1–F12 on the physical keys instead.
+
 Done on a **MacBook Pro 14,3** (15-inch, 2017) with a full-disk Omarchy 4 install, kernel 7.2. Result: Touch Bar lit with Esc and media keys, **hold Fn for F1–F12**, FaceTime camera and ambient light sensor working, with automatic screen brightness. The Touch Bar driver and T1 recovery come from other people's projects (credited below); this repo ties them together and adds the Omarchy side.
 
 **Contents:** [Is this for me?](#is-this-for-me) · [How the T1 works](#how-the-t1-works-and-why-the-touch-bar-goes-black) · [Step 1: back up](#step-1-back-up-the-t1-firmware) · [Step 2: revive the T1](#step-2-revive-the-t1-if-its-in-recovery-mode) · [Step 3: Touch Bar driver](#step-3-install-a-touch-bar-driver) · [Step 4: Omarchy settings](#step-4-omarchy-keyboard-and-touchpad-settings) · [What works](#what-works-now) · [Troubleshooting](#troubleshooting) · [keyd fallback](#fallback-no-touch-bar-keys-on-the-keyboard-instead) · [FAQ](#faq) · [Optional extras](#optional-extras) · [Credits](#credits)
@@ -150,7 +152,7 @@ Check the Touch Bar stack at any time with `~/macbook-t1-touchbar/standalone/t1-
 
 ## Fallback: no Touch Bar? Keys on the keyboard instead
 
-If you can't revive the T1 (or don't want to touch its firmware), this puts the missing keys on the physical keyboard with [keyd](https://github.com/rvaiya/keyd):
+The real Touch Bar (Steps 1–3) is the recommended setup. This is for when you can't revive the T1, or you'd simply rather not have the Touch Bar: no firmware restore, no out-of-tree kernel driver, and every key under your fingers. Skip Steps 1–3, do Step 4, and put the missing keys on the physical keyboard with [keyd](https://github.com/rvaiya/keyd):
 
 ```bash
 ~/macbook-pro-t1-touchbar-linux/install.sh --keyd-fallback

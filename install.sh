@@ -5,6 +5,7 @@
 #                                 libinput touchpad quirks (use with a working Touch Bar)
 #   ./install.sh --keyd-fallback  also puts Esc, F1-F12, volume and brightness on the
 #                                 keyboard with keyd, for when the Touch Bar can't be revived
+#                                 or you'd rather not use it
 #
 # The Touch Bar driver itself is not installed by this script; see the README.
 # Safe to run again: existing files are backed up to *.bak.<timestamp> first.
