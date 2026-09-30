@@ -2,7 +2,7 @@
 
 A complete, tested walkthrough for the **2016–2017 Touch Bar MacBook Pro** (T1 chip) on Linux: bring a **dead, black Touch Bar** back (even after Linux wiped macOS), get **Esc, F1–F12, volume and brightness** on it, and set up the keyboard and touchpad for **[Omarchy](https://omarchy.org)** (Arch Linux + Hyprland).
 
-Done on a **MacBook Pro 14,3** (15-inch, 2017) with a full-disk Omarchy 4 install, kernel 7.2. Result: Touch Bar lit with Esc and media keys, **hold Fn for F1–F12**, FaceTime camera working. The Touch Bar driver and T1 recovery come from other people's projects (credited below); this repo ties them together and adds the Omarchy side.
+Done on a **MacBook Pro 14,3** (15-inch, 2017) with a full-disk Omarchy 4 install, kernel 7.2. Result: Touch Bar lit with Esc and media keys, **hold Fn for F1–F12**, FaceTime camera and ambient light sensor working, with automatic screen brightness. The Touch Bar driver and T1 recovery come from other people's projects (credited below); this repo ties them together and adds the Omarchy side.
 
 **Contents:** [Is this for me?](#is-this-for-me) · [How the T1 works](#how-the-t1-works-and-why-the-touch-bar-goes-black) · [Step 1: back up](#step-1-back-up-the-t1-firmware) · [Step 2: revive the T1](#step-2-revive-the-t1-if-its-in-recovery-mode) · [Step 3: Touch Bar driver](#step-3-install-a-touch-bar-driver) · [Step 4: Omarchy settings](#step-4-omarchy-keyboard-and-touchpad-settings) · [What works](#what-works-now) · [Troubleshooting](#troubleshooting) · [keyd fallback](#fallback-no-touch-bar-keys-on-the-keyboard-instead) · [FAQ](#faq) · [Optional extras](#optional-extras) · [Credits](#credits)
 
@@ -95,9 +95,9 @@ What ends up on the system (copies of this machine's files are in [`touchbar/`](
 | File | Purpose |
 |---|---|
 | DKMS module `appleibridge` | `apple-ibridge`, `apple-ib-tb`, `apple-ib-als`; rebuilt automatically on kernel updates. The patch only adapts three functions to kernel API changes (`report_fixup` returns `const`, `platform_driver.remove` returns `void`, no `.owner` on ACPI drivers). |
-| `/etc/modules-load.d/apple-touchbar.conf` | Loads the driver at boot. |
+| `/etc/modules-load.d/apple-touchbar.conf` | Loads the driver at boot. The copy in this repo also loads `apple-ib-als` (light sensor); see [below](#optional-ambient-light-sensor-and-automatic-brightness). |
 | `/etc/modprobe.d/apple-ib-tb.conf` | `options apple-ib-tb fnmode=1`: the bar shows Esc + brightness/volume/media, **hold Fn for F1–F12**. `fnmode=2` flips that; `0` = F-keys only; `3` = media keys only. |
-| `/etc/modprobe.d/apple-ib-als.conf` | `blacklist apple-ib-als`: the light-sensor module can fail to load (see [FAQ](#faq)). |
+| `/etc/modprobe.d/apple-ib-als.conf` | `blacklist apple-ib-als`, written by the installer because the light-sensor module can fail to load. It loads fine with `modprobe`; remove this file to use the sensor. |
 | `apple-touchbar.service` + `/usr/local/sbin/apple-touchbar-handover` | At boot, `hid-sensor-hub` grabs the Touch Bar's HID interface first. This moves it to `apple-ibridge-hid`, otherwise the bar stays dark while `lsmod` looks fine. |
 
 > **Known issue in the handover script** (found here): it checks for a hard-coded `0003:05AC:8600.0001`, but after a T1 revive the devices are numbered `.0002`/`.0003`, so it exits "T1 not ready" and the bar stays dark. Fix in `/usr/local/sbin/apple-touchbar-handover`: replace `if [[ ! -e /sys/bus/hid/devices/0003:${VIDPID}.0001 ]]; then` with `if [[ ! -e $1 ]]; then`.
@@ -131,7 +131,7 @@ Update later with `cd ~/macbook-pro-t1-touchbar-linux && git pull && ./install.s
 | FaceTime camera | ✅ | `uvcvideo` on the T1 (`/dev/video0`) |
 | Wi-Fi (BCM43602) | ⚠️ | Works, weak signal; see [Wi-Fi fix](#optional-fix-weak-wi-fi-signal) |
 | USB-C Ethernet adapter | ✅ | Out of the box (`cdc_ncm`, 1 Gbit/s) |
-| Ambient light sensor | 🔧 | Being worked on; see [FAQ](#faq) |
+| Ambient light sensor | ✅ | `apple-ib-als` (`/sys/bus/iio/devices/iio:device0`), automatic brightness with wluma, see [below](#optional-ambient-light-sensor-and-automatic-brightness) |
 | Touch ID | ❌ with this driver | ✅ with [t1bridge](https://github.com/standardagents/t1bridge) instead |
 
 Check the Touch Bar stack at any time with `~/macbook-t1-touchbar/standalone/t1-touchbar.sh status`.
@@ -197,7 +197,7 @@ The Touch Bar driver: `sudo systemctl disable apple-touchbar.service`, `sudo dkm
 
 **Can I get Touch ID / the fingerprint reader?** Yes, but only with [t1bridge](https://github.com/standardagents/t1bridge), which replaces the driver used here. It provides `fprintd` support for sudo, polkit and the lock screen. The driver in Step 3 can't: it has no code for the T1's Secure Enclave.
 
-**What about the ambient light sensor?** It sits on the same T1 interface as the Touch Bar, so once the handover moves that interface to `apple-ibridge`, the generic `hid-sensor-als` can't reach it and only `apple-ib-als` can. That module fails to load with `Unknown symbol iio_triggered_buffer_setup_ext` unless `industrialio-triggered-buffer` is loaded first, which is why it's blacklisted by default. Being worked on in this repo.
+**What about the ambient light sensor?** It sits on the same T1 interface as the Touch Bar, so once the handover moves that interface to `apple-ibridge`, the generic `hid-sensor-als` can't reach it and only `apple-ib-als` can. That module fails with `Unknown symbol iio_triggered_buffer_setup_ext` when loaded with `insmod`, because `industrialio-triggered-buffer` isn't loaded first; `modprobe` loads it automatically and it works. See [the light sensor section](#optional-ambient-light-sensor-and-automatic-brightness).
 
 **Will an Omarchy update undo this?** No. The driver is DKMS (rebuilt for each kernel), the configs live in `/etc` and in your own `~/.config/hypr`.
 
@@ -206,6 +206,40 @@ The Touch Bar driver: `sudo systemctl disable apple-touchbar.service`, `sudo dkm
 ## Optional extras
 
 These aren't needed for the Touch Bar, keyboard or touchpad, and `install.sh` doesn't do them.
+
+### Optional: ambient light sensor and automatic brightness
+
+The light sensor next to the camera is on the T1. Load its driver (tested on the 14,3: readings drop to 0 when you cover it):
+
+```bash
+sudo modprobe apple-ib-als
+watch -n0.5 cat /sys/bus/iio/devices/iio:device0/in_illuminance_input    # lux
+```
+
+Keep it across reboots:
+
+```bash
+sudo rm /etc/modprobe.d/apple-ib-als.conf
+echo apple-ib-als | sudo tee -a /etc/modules-load.d/apple-touchbar.conf
+sudo limine-mkinitcpio          # or: sudo mkinitcpio -P
+```
+
+For automatic brightness, [wluma](https://github.com/max-baz/wluma) reads the sensor and learns: change the brightness with the Touch Bar and it remembers that level for that amount of light. It also dims the keyboard backlight.
+
+```bash
+yay -S wluma
+mkdir -p ~/.config/wluma && cp extras/wluma/config.toml ~/.config/wluma/
+install -Dm755 extras/auto-brightness ~/.local/bin/auto-brightness
+auto-brightness on
+```
+
+[`extras/wluma/config.toml`](extras/wluma/config.toml) sets `capturer = "none"`, so brightness follows the light sensor only. With screen capture on, wluma found no working capture protocol on this dual-GPU MacBook and exited every few seconds. It also turns off wluma's idle dimming, because Omarchy already handles idle.
+
+[`extras/auto-brightness`](extras/auto-brightness) turns it `on`, `off`, `toggle` (default) or shows the `status`, with a notification. The choice survives reboots. To put it on a key, add this to `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + ALT + B", "Toggle auto brightness", os.getenv("HOME") .. "/.local/bin/auto-brightness")
+```
 
 ### Optional: stop Bluetooth auto-accepting pairings
 

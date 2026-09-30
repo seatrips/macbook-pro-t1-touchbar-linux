@@ -1,0 +1,18 @@
+# wluma: automatic screen brightness from the T1 ambient light sensor
+# (apple-ib-als, /sys/bus/iio/devices/iio:device0).
+# It learns: adjust brightness by hand and it remembers that level for
+# that light. Toggle on/off with Super + Alt + B (~/.local/bin/auto-brightness).
+
+[als.iio]
+path = "/sys/bus/iio/devices"
+
+# Omarchy already handles idle (lock, screen off); don't dim on top of it.
+[idle]
+enabled = false
+
+[[output.backlight]]
+name = "eDP-1"
+path = "/sys/class/backlight/gmux_backlight"
+# Light sensor only. Screen capture finds no working protocol on this
+# dual-GPU MacBook (wayland) and makes wluma exit, so don't use it.
+capturer = "none"

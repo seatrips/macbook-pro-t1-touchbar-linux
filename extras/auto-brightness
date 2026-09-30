@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Turn automatic screen brightness (wluma) on or off. The choice survives
+# reboots, because it enables/disables the user service.
+#   auto-brightness [on|off|toggle|status]   (default: toggle)
+
+notify() { notify-send -a "Auto brightness" -t 2500 "$@" 2>/dev/null || true; echo "$*"; }
+
+# The user's choice is whether the service is enabled, not whether it happens
+# to be running right now (it may be restarting).
+state() { systemctl --user is-enabled --quiet wluma.service 2>/dev/null && echo on || echo off; }
+
+if ! command -v wluma >/dev/null; then
+  notify "Auto brightness unavailable" "wluma is not installed: yay -S wluma"
+  exit 1
+fi
+
+case "${1:-toggle}" in
+  on) want=on ;;
+  off) want=off ;;
+  toggle) [[ $(state) == on ]] && want=off || want=on ;;
+  status) state; exit 0 ;;
+  *) echo "usage: auto-brightness [on|off|toggle|status]" >&2; exit 2 ;;
+esac
+
+if [[ $want == on ]]; then
+  if systemctl --user enable --now wluma.service 2>/dev/null; then
+    notify "Auto brightness on"
+  else
+    notify "Auto brightness failed to start" "journalctl --user -u wluma"
+    exit 1
+  fi
+else
+  systemctl --user disable --now wluma.service 2>/dev/null
+  notify "Auto brightness off"
+fi
