@@ -35,9 +35,8 @@ This setup puts all those missing keys on the physical keyboard.
 | **2-finger tap** | Right click |
 | **3-finger tap** | Middle click |
 | **3-finger slide** | Select / drag, no hard press needed (macOS-style three-finger drag) |
-| **Tap, then touch again and slide** | Select / drag (a short lift doesn't drop it) |
 
-Light brushes and resting palms are ignored, so tapping causes fewer accidental clicks. The Force Touch pad only clicks on a firm press, which is why selecting works with taps and three fingers instead.
+Light brushes and resting palms are ignored, so tapping causes fewer accidental clicks. The Force Touch pad only clicks on a firm press, which is why selecting works with a three-finger slide instead. Tap-and-drag is turned off because a stray tap plus a touch kept starting selections by itself.
 
 ## Install
 
