@@ -243,6 +243,26 @@ auto-brightness on
 o.bind("SUPER + ALT + B", "Toggle auto brightness", os.getenv("HOME") .. "/.local/bin/auto-brightness")
 ```
 
+### Optional: touchpad settings app (sliders)
+
+Hyprland has no settings window for the touchpad. [`extras/touchpad-settings`](extras/touchpad-settings) is a small GTK/Adwaita app with sliders for pointer speed and scroll speed, and switches for acceleration, tap to click, natural scrolling, ignoring the touchpad while typing, two-finger right click and tap-and-drag. These apply live while you try them. **Save** writes them to `~/.config/hypr/touchpad.lua`, and closing without saving puts the old values back.
+
+It also has a **tap sensitivity** slider (light to firm), which rewrites `/etc/libinput/local-overrides.quirks` with a higher or lower touch size and palm threshold. That step asks for your password in a floating terminal and takes effect after you log out and back in.
+
+```bash
+install -Dm755 extras/touchpad-settings ~/.local/bin/touchpad-settings
+install -Dm644 extras/touchpad-settings.desktop ~/.local/share/applications/touchpad-settings.desktop
+printf -- '-- Written by touchpad-settings\n' > ~/.config/hypr/touchpad.lua
+printf '\nrequire("hypr.touchpad")\n' >> ~/.config/hypr/input.lua
+```
+
+Put it on a key (it opens as a floating window) by adding this to `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + SHIFT + T", "Touchpad settings", o.launch_sole("org.omarchy.touchpad-settings", os.getenv("HOME") .. "/.local/bin/touchpad-settings"))
+o.window("org.omarchy.touchpad-settings", { float = true, center = true, size = { 540, 760 } })
+```
+
 ### Optional: stop Bluetooth auto-accepting pairings
 
 This isn't specific to MacBooks, and `install.sh` doesn't do it. Omarchy runs `bt-agent -c NoInputNoOutput` (the `bt-agent` user service), which **accepts every Bluetooth pairing request without asking**. While Bluetooth is on, someone nearby who knows your laptop's Bluetooth address could pair a device, such as a fake keyboard, and you'd see no prompt. On a laptop you use for work or private things, turn it off:

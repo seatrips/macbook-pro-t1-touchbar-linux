@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Touchpad Settings
+Comment=Pointer speed, scrolling and tap sensitivity for the MacBook touchpad
+Exec=touchpad-settings
+Icon=input-touchpad
+Terminal=false
+Categories=Settings;HardwareSettings;
+StartupWMClass=org.omarchy.touchpad-settings

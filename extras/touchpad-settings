@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""Touchpad settings for the MacBook Pro Touch Bar (applespi) on Omarchy / Hyprland.
+
+Sliders and switches apply live through `hyprctl eval`. Save writes them to
+~/.config/hypr/touchpad.lua (loaded from input.lua), so they survive a restart.
+Closing without saving puts the saved values back.
+
+Tap sensitivity is a libinput quirk (/etc/libinput/local-overrides.quirks). It needs
+sudo and only takes effect after logging out and back in.
+"""
+
+import os
+import re
+import subprocess
+import tempfile
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk  # noqa: E402
+
+APP_ID = "org.omarchy.touchpad-settings"
+DEVICE = "apple-spi-touchpad"
+LUA = os.path.expanduser("~/.config/hypr/touchpad.lua")
+QUIRKS = "/etc/libinput/local-overrides.quirks"
+
+# name: (default, label, subtitle)
+SWITCHES = {
+    "tap_to_click": (True, "Tap to click", "A light tap clicks, without pressing the pad down"),
+    "natural_scroll": (True, "Natural scrolling", "Content moves with your fingers, like macOS"),
+    "disable_while_typing": (True, "Ignore touchpad while typing", "Stops stray taps from moving the cursor"),
+    "clickfinger_behavior": (True, "Two-finger click = right click", "Off: press the lower-right corner instead"),
+    "tap_and_drag": (False, "Tap and drag", "Double-tap and hold to drag; can start stray selections"),
+}
+
+# Tap firmness level -> (touch down, touch up, palm size). Level 1 is close to libinput's stock
+# Apple values (150:130, palm 1600); higher = a firmer, bigger touch is needed to count as a tap.
+FIRMNESS = {
+    1: (150, 130, 1600),
+    2: (200, 170, 1200),
+    3: (250, 210, 1000),
+    4: (300, 250, 900),
+    5: (350, 300, 800),
+    6: (400, 350, 700),
+    7: (450, 400, 600),
+}
+
+QUIRKS_TEMPLATE = """\
+# Fewer accidental taps on the MacBook Pro Touch Bar (applespi) touchpad.
+# Overrides /usr/share/libinput/50-system-apple.quirks (TouchSizeRange=150:130, PalmSizeThreshold=1600).
+# Higher TouchSizeRange = light brushes don't count as touches (and so can't tap).
+# Lower PalmSizeThreshold = large contacts are ignored as palms sooner.
+# Takes effect after logging out and back in. Set with touchpad-settings (tap firmness {level}).
+[Apple Laptop Touchpad (SPI) applespi driver - fewer accidental taps]
+MatchUdevType=touchpad
+MatchBus=spi
+MatchVendor=0x06CB
+AttrTouchSizeRange={down}:{up}
+AttrPalmSizeThreshold={palm}
+
+# keyd re-sends every keystroke through its own virtual keyboard (USB bus), so libinput
+# treats it as external and never pauses the touchpad while typing. Mark it internal so
+# disable-while-typing works again.
+[keyd virtual keyboard - internal for disable-while-typing]
+MatchUdevType=keyboard
+MatchName=keyd virtual keyboard
+AttrKeyboardIntegration=internal
+
+# The applespi keyboard reports vendor 0x0000, so libinput's own "Apple Internal Keyboard (SPI)"
+# quirk (vendor 0x05AC) never matches it. Mark it internal so it pairs with the touchpad for
+# disable-while-typing when keyd is not in use (the default with the real Touch Bar driver).
+[Apple SPI keyboard (applespi) - internal for disable-while-typing]
+MatchUdevType=keyboard
+MatchBus=spi
+MatchName=Apple SPI Keyboard
+AttrKeyboardIntegration=internal
+"""
+
+
+def hypr_option(name):
+    """Current value of a global Hyprland option, e.g. input:touchpad:scroll_factor."""
+    out = subprocess.run(["hyprctl", "getoption", name], capture_output=True, text=True).stdout
+    first = out.splitlines()[0] if out else ""
+    kind, _, value = first.partition(": ")
+    if kind == "bool":
+        return value.strip() == "true"
+    if kind in ("float", "int"):
+        return float(value)
+    return value.strip()
+
+
+def load_settings():
+    s = {
+        "sensitivity": 0.0,
+        "accel_profile": "adaptive",
+        "scroll_factor": hypr_option("input:touchpad:scroll_factor") or 1.0,
+    }
+    for name, (default, _, _) in SWITCHES.items():
+        live = hypr_option("input:touchpad:" + name)
+        s[name] = live if isinstance(live, bool) else default
+    try:
+        with open(LUA) as f:
+            text = f.read()
+    except FileNotFoundError:
+        return s
+    for key, raw in re.findall(r"(\w+)\s*=\s*(\"[^\"]*\"|-?[\d.]+|true|false)", text):
+        if key not in s:
+            continue
+        if raw in ("true", "false"):
+            s[key] = raw == "true"
+        elif raw.startswith('"'):
+            s[key] = raw.strip('"')
+        else:
+            s[key] = float(raw)
+    return s
+
+
+def lua_value(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, float):
+        return f"{v:.2f}"
+    return f'"{v}"'
+
+
+def lua_lines(s):
+    device = f'hl.device({{ name = "{DEVICE}", sensitivity = {lua_value(s["sensitivity"])}, accel_profile = {lua_value(s["accel_profile"])} }})'
+    fields = ", ".join(f"{k} = {lua_value(s[k])}" for k in ["scroll_factor", *SWITCHES])
+    touchpad = f"hl.config({{ input = {{ touchpad = {{ {fields} }} }} }})"
+    return device, touchpad
+
+
+def apply_live(s):
+    for line in lua_lines(s):
+        subprocess.run(["hyprctl", "eval", line], capture_output=True)
+
+
+def save_lua(s):
+    device, touchpad = lua_lines(s)
+    with open(LUA, "w") as f:
+        f.write(
+            "-- Touchpad settings, written by touchpad-settings (SUPER + SHIFT + T).\n"
+            "-- Loaded from input.lua after macbook.lua, so these values win.\n"
+            "-- Edit here or in the app; the app overwrites this file on Save.\n"
+            f"{device}\n{touchpad}\n"
+        )
+
+
+def current_firmness():
+    try:
+        with open(QUIRKS) as f:
+            text = f.read()
+    except OSError:
+        return 4
+    m = re.search(r"AttrTouchSizeRange=(\d+):", text)
+    if not m:
+        return 1
+    down = int(m.group(1))
+    return min(FIRMNESS, key=lambda lvl: abs(FIRMNESS[lvl][0] - down))
+
+
+class Window(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Touchpad", default_width=520, default_height=720)
+        self.saved = load_settings()
+        self.s = dict(self.saved)
+        self.saved_firmness = current_firmness()
+        self.widgets = {}
+
+        page = Adw.PreferencesPage()
+
+        # Pointer and scrolling
+        motion = Adw.PreferencesGroup(title="Pointer and scrolling", description="Changes apply as you move them")
+        self.speed = self.slider_row(motion, "Pointer speed", "sensitivity", -1.0, 1.0, 0.05, marks=[(0.0, "default")])
+        self.scroll = self.slider_row(motion, "Scroll speed", "scroll_factor", 0.1, 3.0, 0.05, marks=[(1.0, "1×")])
+
+        accel = Adw.SwitchRow(title="Pointer acceleration", subtitle="Off: the pointer moves at a constant speed (flat)")
+        accel.set_active(self.s["accel_profile"] != "flat")
+        accel.connect("notify::active", lambda row, _: self.set("accel_profile", "adaptive" if row.get_active() else "flat"))
+        self.widgets["accel_profile"] = accel
+        motion.add(accel)
+        page.add(motion)
+
+        # Taps and clicks
+        clicks = Adw.PreferencesGroup(title="Taps and clicks")
+        for name, (_, label, subtitle) in SWITCHES.items():
+            row = Adw.SwitchRow(title=label, subtitle=subtitle)
+            row.set_active(self.s[name])
+            row.connect("notify::active", lambda row, _, n=name: self.set(n, row.get_active()))
+            self.widgets[name] = row
+            clicks.add(row)
+        page.add(clicks)
+
+        # Tap firmness (libinput quirk)
+        taps = Adw.PreferencesGroup(
+            title="Tap sensitivity",
+            description="How firm a touch must be to count as a tap. Needs your password; "
+            "takes effect after you log out and back in.",
+        )
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin_top=12, margin_bottom=12, margin_start=12, margin_end=12)
+        self.firmness = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 1, max(FIRMNESS), 1)
+        self.firmness.set_digits(0)
+        self.firmness.set_round_digits(0)
+        self.firmness.set_value(self.saved_firmness)
+        self.firmness.add_mark(1, Gtk.PositionType.BOTTOM, "light")
+        self.firmness.add_mark(max(FIRMNESS), Gtk.PositionType.BOTTOM, "firm")
+        self.firmness_label = Gtk.Label(xalign=0, css_classes=["dim-label", "caption"])
+        self.firmness.connect("value-changed", lambda *_: self.update_firmness_label())
+        self.update_firmness_label()
+        box.append(self.firmness)
+        box.append(self.firmness_label)
+        frame = Gtk.ListBox(css_classes=["boxed-list"], selection_mode=Gtk.SelectionMode.NONE)
+        frame.append(box)
+        taps.add(frame)
+        page.add(taps)
+
+        # Buttons
+        revert = Gtk.Button(label="Revert")
+        revert.connect("clicked", lambda *_: self.revert())
+        save = Gtk.Button(label="Save", css_classes=["suggested-action"])
+        save.connect("clicked", lambda *_: self.save())
+        header = Adw.HeaderBar()
+        header.pack_start(revert)
+        header.pack_end(save)
+
+        self.toasts = Adw.ToastOverlay(child=page)
+        view = Adw.ToolbarView(content=self.toasts)
+        view.add_top_bar(header)
+        self.set_content(view)
+        self.connect("close-request", self.on_close)
+
+    def slider_row(self, group, title, key, lo, hi, step, marks=()):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, margin_top=10, margin_bottom=10, margin_start=12, margin_end=12)
+        box.append(Gtk.Label(label=title, xalign=0))
+        scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, step)
+        scale.set_draw_value(True)
+        scale.set_value_pos(Gtk.PositionType.RIGHT)
+        scale.set_digits(2)
+        scale.set_value(self.s[key])
+        for value, label in marks:
+            scale.add_mark(value, Gtk.PositionType.BOTTOM, label)
+        scale.connect("value-changed", lambda sc: self.set(key, round(sc.get_value(), 2)))
+        box.append(scale)
+        self.widgets[key] = scale
+        row = Gtk.ListBoxRow(child=box, activatable=False)
+        group.add(row)
+        return scale
+
+    def set(self, key, value):
+        self.s[key] = value
+        apply_live(self.s)
+
+    def update_firmness_label(self):
+        down, up, palm = FIRMNESS[int(self.firmness.get_value())]
+        note = "  (current)" if int(self.firmness.get_value()) == self.saved_firmness else ""
+        self.firmness_label.set_label(f"Touch size {down}:{up}, palm threshold {palm}{note}")
+
+    def save(self):
+        save_lua(self.s)
+        self.saved = dict(self.s)
+        level = int(self.firmness.get_value())
+        if level != self.saved_firmness:
+            self.save_quirks(level)
+        else:
+            self.toasts.add_toast(Adw.Toast(title="Saved"))
+
+    def save_quirks(self, level):
+        down, up, palm = FIRMNESS[level]
+        fd, tmp = tempfile.mkstemp(prefix="touchpad-quirks-", suffix=".quirks")
+        with os.fdopen(fd, "w") as f:
+            f.write(QUIRKS_TEMPLATE.format(level=level, down=down, up=up, palm=palm))
+        os.chmod(tmp, 0o644)
+        # No polkit agent on Omarchy, so ask for the password in a floating terminal.
+        cmd = (
+            f"echo 'Tap sensitivity: touch size {down}:{up}, palm {palm}'; "
+            f"sudo install -m644 {tmp} {QUIRKS} && echo 'Saved. Log out and back in to use it.'; rm -f {tmp}"
+        )
+        subprocess.Popen(["omarchy-launch-floating-terminal-with-presentation", cmd])
+        self.saved_firmness = level
+        self.update_firmness_label()
+        self.toasts.add_toast(Adw.Toast(title="Saved. Enter your password in the terminal, then log out and in"))
+
+    def revert(self):
+        saved = dict(self.saved)
+        for key, widget in self.widgets.items():
+            if key == "accel_profile":
+                widget.set_active(saved[key] != "flat")
+            elif isinstance(widget, Gtk.Scale):
+                widget.set_value(saved[key])
+            else:
+                widget.set_active(saved[key])
+        self.firmness.set_value(self.saved_firmness)
+        self.s = saved
+        apply_live(self.s)
+
+    def on_close(self, *_):
+        if self.s != self.saved:
+            apply_live(self.saved)
+        return False
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_activate(self):
+        win = self.get_active_window() or Window(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    App().run()
