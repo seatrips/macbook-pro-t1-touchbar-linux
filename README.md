@@ -280,7 +280,14 @@ Reboot (reloading the driver also works, but drops Wi-Fi, so have a cable handy)
 
 To undo: `sudo rm /lib/firmware/brcm/brcmfmac43602-pcie.txt` and reboot. The file isn't owned by any package, so updates won't overwrite or remove it.
 
-**Also keep the transmit power cap.** The NVRAM file doesn't fix the transmit power: without the cap the chip still goes to 31 dBm. On the 14,3, a quick test with the cap turned off gave -71 to -74 dBm, 90 Mbit/s down and 81 Mbit/s up, against -68 dBm and 108/162 Mbit/s with it on just before. Readings vary a lot from minute to minute (with the cap back on: -63 to -74 dBm, 60 to 108 Mbit/s), so the difference is small and noisy, but the cap never made things worse and costs nothing, so it stays on.
+**The transmit power cap is optional once the NVRAM file is in.** The NVRAM file doesn't change the transmit power (without the cap the chip still reports 31 dBm), but on the 14,3 it no longer makes a measurable difference. A real speed test (curl against speed.cloudflare.com, 3 × 50 MB down and 3 × 20 MB up each way, same spot, 5 GHz ch 64, -62 dBm both times):
+
+| | Cap on (10 dBm) | Cap off (31 dBm) |
+|---|---|---|
+| Download | 140–165, avg 153 Mbit/s | 128–147, avg 136 Mbit/s |
+| Upload | 97–153, avg 120 Mbit/s | 132–141, avg 136 Mbit/s |
+
+The spread within each set is bigger than the gap between them, so it's noise. The cap is kept on here anyway: it costs nothing and may still help at the edge of range, which wasn't tested.
 
 To turn the cap off without deleting the script: `sudo chmod -x /etc/NetworkManager/dispatcher.d/90-wifi-txpower && sudo iw dev wlp3s0 set txpower auto`. To turn it back on: `sudo chmod +x /etc/NetworkManager/dispatcher.d/90-wifi-txpower && sudo iw dev wlp3s0 set txpower fixed 1000`. Neither drops the connection.
 
