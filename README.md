@@ -291,7 +291,7 @@ The spread within each set is bigger than the gap between them, so it's noise. T
 
 To turn the cap off without deleting the script: `sudo chmod -x /etc/NetworkManager/dispatcher.d/90-wifi-txpower && sudo iw dev wlp3s0 set txpower auto`. To turn it back on: `sudo chmod +x /etc/NetworkManager/dispatcher.d/90-wifi-txpower && sudo iw dev wlp3s0 set txpower fixed 1000`. Neither drops the connection.
 
-The Linux firmware for this chip is from 2015 and can't detect the country it's in. It then transmits at a bogus **31 dBm**, which also drowns out its own receiver: the signal shows around -93 dBm even with a phone hotspot right next to the laptop, and speeds drop to a few Mbit/s ([kernel bug 193121](https://bugzilla.kernel.org/show_bug.cgi?id=193121)). Capping transmit power at 10 dBm fixes most of it. On the 14,3 this setup was written on:
+**Background: why the cap was added.** Before the NVRAM file was found, this was the workaround. The Linux firmware for this chip is from 2015 and can't detect the country it's in. It then transmits at a bogus **31 dBm**, which also drowns out its own receiver: the signal shows around -93 dBm even with a phone hotspot right next to the laptop, and speeds drop to a few Mbit/s ([kernel bug 193121](https://bugzilla.kernel.org/show_bug.cgi?id=193121)). Capping transmit power at 10 dBm fixes most of it. On the 14,3 this setup was written on:
 
 | | Before | After (first test) | After reboot, set by the script |
 |---|---|---|---|
