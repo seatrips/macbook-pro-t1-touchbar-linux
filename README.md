@@ -131,7 +131,7 @@ Update later with `cd ~/macbook-pro-t1-touchbar-linux && git pull && ./install.s
 | Keyboard | ✅ | In-kernel `applespi`. **Fn + ↑/↓ = Page Up/Down, Fn + ←/→ = Home/End, Fn + Backspace = Delete** |
 | Touchpad | ✅ | In-kernel `applespi` + Step 4 |
 | FaceTime camera | ✅ | `uvcvideo` on the T1 (`/dev/video0`) |
-| Wi-Fi (BCM43602) | ⚠️ | Works, weak signal; see [Wi-Fi fix](#optional-fix-weak-wi-fi-signal) |
+| Wi-Fi (BCM43602) | ✅ | Needs the NVRAM file for good signal and 5 GHz; see [Wi-Fi fix](#optional-fix-weak-wi-fi-signal) |
 | USB-C Ethernet adapter | ✅ | Out of the box (`cdc_ncm`, 1 Gbit/s) |
 | Ambient light sensor | ✅ | `apple-ib-als` (`/sys/bus/iio/devices/iio:device0`), automatic brightness with wluma, see [below](#optional-ambient-light-sensor-and-automatic-brightness) |
 | Touch ID | ❌ with this driver | ✅ with [t1bridge](https://github.com/standardagents/t1bridge) instead |
@@ -262,6 +262,26 @@ systemctl --user unmask bt-agent.service && systemctl --user enable --now bt-age
 
 This only applies to models with the Broadcom **BCM43602** Wi-Fi chip (14,2 and 14,3, and some 13,x; check with `lspci | grep -i 43602`). `install.sh` doesn't do it.
 
+**The real fix: add the missing NVRAM file.** Linux ships the firmware for this chip but no board calibration file (`brcmfmac43602-pcie.txt`). Without it the chip runs uncalibrated: weak signal, 2.4 GHz only, and the Broadcom placeholder MAC `00:90:4c:0d:f4:3e` (check with `ip link show wlp3s0`, look for `permaddr`). [`firmware/brcmfmac43602-pcie.txt`](firmware/brcmfmac43602-pcie.txt) is an NVRAM dump from a 15" MacBook Pro, taken from [nohzafk/omarchy-macbookpro-t1](https://github.com/nohzafk/omarchy-macbookpro-t1) (originally a gist by MikeRatcliffe). Its `macaddr=` line is set to `02:90:4c:0d:f4:3e`, a locally administered address, because the real Apple MAC isn't known.
+
+```bash
+sudo install -o root -g root -m 644 firmware/brcmfmac43602-pcie.txt /lib/firmware/brcm/
+```
+
+Reboot (reloading the driver also works, but drops Wi-Fi, so have a cable handy). Then `iw phy | grep Band` should list `Band 2` (5 GHz) as well as `Band 1`. On the 14,3, in the same spot:
+
+| | Before (no NVRAM, txpower cap on) | After NVRAM file |
+|---|---|---|
+| Band | 2.4 GHz only | 2.4 + 5 GHz (connected on ch 64, 40 MHz) |
+| Signal | -84 dBm | -68 dBm |
+| Download (rx) | 1 Mbit/s | 108 Mbit/s |
+| Upload (tx) | 24 Mbit/s | 162 Mbit/s |
+| Networks visible | 6 | 19 |
+
+To undo: `sudo rm /lib/firmware/brcm/brcmfmac43602-pcie.txt` and reboot. The file isn't owned by any package, so updates won't overwrite or remove it.
+
+**Older workaround: transmit power cap.** This came first and is still installed on the 14,3; it's not yet tested whether it's still needed with the NVRAM file.
+
 The Linux firmware for this chip is from 2015 and can't detect the country it's in. It then transmits at a bogus **31 dBm**, which also drowns out its own receiver: the signal shows around -93 dBm even with a phone hotspot right next to the laptop, and speeds drop to a few Mbit/s ([kernel bug 193121](https://bugzilla.kernel.org/show_bug.cgi?id=193121)). Capping transmit power at 10 dBm fixes most of it. On the 14,3 this setup was written on:
 
 | | Before | After (first test) | After reboot, set by the script |
@@ -284,7 +304,7 @@ To keep it, install [`etc/NetworkManager/dispatcher.d/90-wifi-txpower`](etc/Netw
 sudo install -o root -g root -m 755 etc/NetworkManager/dispatcher.d/90-wifi-txpower /etc/NetworkManager/dispatcher.d/
 ```
 
-Reboot once to confirm it sticks (tested on the 14,3: after a reboot the cap was applied without doing anything). Then check with `iw dev wlp3s0 info | grep txpower`, which should say `10.00 dBm`. If it still says `31.00 dBm`, the interface name in the script doesn't match yours, or the file isn't executable and owned by root (NetworkManager skips it otherwise). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. Wi-Fi stays 2.4 GHz only; a USB Wi-Fi adapter is the only full fix.
+Reboot once to confirm it sticks (tested on the 14,3: after a reboot the cap was applied without doing anything). Then check with `iw dev wlp3s0 info | grep txpower`, which should say `10.00 dBm`. If it still says `31.00 dBm`, the interface name in the script doesn't match yours, or the file isn't executable and owned by root (NetworkManager skips it otherwise). To undo: `sudo rm /etc/NetworkManager/dispatcher.d/90-wifi-txpower`. On its own the cap leaves Wi-Fi on 2.4 GHz only; the NVRAM file above fixes that.
 
 ### Optional: Security Watch (firewall and daily security checks)
 
