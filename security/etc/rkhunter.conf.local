@@ -7,6 +7,8 @@ ALLOWHIDDENFILE=/usr/share/man/man5/.k5identity.5.gz
 ALLOWHIDDENFILE=/usr/share/man/man5/.k5login.5.gz
 # Empty shared-memory file seen on the machine this was written on
 ALLOWDEVFILE=/dev/shm/BC2-GPU-*
+# EasyEffects (LSP plugins) shared memory
+ALLOWDEVFILE="/dev/shm/lsp-catalog-*"
 # sshd is disabled; OpenSSH's defaults are safe
 ALLOW_SSH_ROOT_USER=unset
 ALLOW_SSH_PROT_V1=2
