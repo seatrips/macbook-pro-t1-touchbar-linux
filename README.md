@@ -359,6 +359,7 @@ Then open OpenSnitch's preferences (the tray icon) and set the popup's **default
 | `security/usr/local/bin/security-watch` | `/usr/local/bin/` | Runs the three checks and notifies you about new findings. The details go to `/var/log/security-watch.log`. |
 | `security/etc/systemd/system/security-watch.{service,timer}` | `/etc/systemd/system/` | Runs the script daily, 10 minutes after boot and in the background at low priority. |
 | `security/etc/pacman.d/hooks/rkhunter-propupd.hook` | `/etc/pacman.d/hooks/` | Updates rkhunter's file baseline after package updates. |
+| `security/etc/pacman.d/hooks/zz-security-watch.hook` | `/etc/pacman.d/hooks/` | Runs Security Watch right after every update, install or removal. It also checks for failed services, `.pacnew` files, ports open to the network, passwordless sudo, and ufw/OpenSnitch/sshd/bt-agent changes, and sends "Post-update scan: all clear" when nothing new turned up. |
 | `security/etc/rkhunter.conf.local` | `/etc/` | Whitelists rkhunter warnings that are normal on Arch/Omarchy (`egrep`/`fgrep`/`ldd` being scripts, hidden Kerberos man pages, unset sshd options while sshd is off). |
 | `security/etc/lynis/custom.prf` | `/etc/lynis/` | Skips lynis' "vulnerable packages" test, because it also counts CVEs with no fix yet. `arch-audit --upgradable` covers the ones you can fix. |
 | `security/etc/opensnitchd/rules/000-allow-*.json` | `/etc/opensnitchd/rules/` | The three basic allow rules. |

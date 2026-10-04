@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Queueing Security Watch post-update scan...
+When = PostTransaction
+Exec = /bin/sh -c 'touch /var/lib/security-watch/after-update; /usr/bin/systemctl start --no-block security-watch.service'

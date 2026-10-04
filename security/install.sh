@@ -31,6 +31,8 @@ echo "==> rkhunter and lynis config"
 sinstall 644 etc/rkhunter.conf.local /etc/rkhunter.conf.local
 sinstall 644 etc/lynis/custom.prf /etc/lynis/custom.prf
 sinstall 644 etc/pacman.d/hooks/rkhunter-propupd.hook /etc/pacman.d/hooks/rkhunter-propupd.hook
+# Runs Security Watch after every update; sorts after rkhunter-propupd so the baseline is fresh.
+sinstall 644 etc/pacman.d/hooks/zz-security-watch.hook /etc/pacman.d/hooks/zz-security-watch.hook
 # rkhunter compares files against this baseline; the hook refreshes it after updates.
 sudo rkhunter --propupd --nolog
 

@@ -22,6 +22,11 @@ notify() {
     notify-send -u critical -a "Security Watch" "$1" "$2"
 }
 
+# Set by the pacman hook: this run follows an update
+AFTER_UPDATE=0
+[[ -f $STATE/after-update ]] && { AFTER_UPDATE=1; rm -f "$STATE/after-update"; }
+rm -f "$STATE/found-new"   # report() runs in a pipe subshell, so it flags via a file
+
 # report NAME TITLE < findings
 # Notifies only about lines not already reported. They count as reported
 # only once the notification is delivered, so nothing is lost while logged out.
@@ -31,6 +36,7 @@ report() {
   touch "$seen"
   new=$(comm -23 "$current" "$seen")
   if [[ -n $new ]]; then
+    touch "$STATE/found-new"
     log "$name: new findings:"$'\n'"$new"
     notify "$title" "$(head -5 <<<"$new")"$'\n\n'"Details: /var/log/security-watch.log" \
       && cp "$current" "$seen"
@@ -53,6 +59,27 @@ if [[ $(date +%u) == 7 || ! -f $STATE/lynis.seen ]]; then
   lynis audit system --quick --quiet --no-colors >/dev/null 2>&1
   grep -E '^warning\[\]=' /var/log/lynis-report.dat 2>/dev/null \
     | cut -d'|' -f1-2 | sed 's/^warning\[\]=//' | report lynis "Lynis security warning"
+fi
+
+# 4. System health and safety settings (cheap; matters most after updates)
+{
+  systemctl --failed --no-legend --plain 2>/dev/null | awk '{print "Failed service: "$1}'
+  find /etc /usr/local -xdev \( -name '*.pacnew' -o -name '*.pacsave' \) 2>/dev/null \
+    | sed 's/^/Config needs merging: /'
+  # TCP ports reachable from the network (loopback and the Docker DNS stub are fine)
+  ss -tlnpH 2>/dev/null | awk '$4 !~ /^(127\.|\[::1\]|172\.17\.0\.1:)/ && $4 !~ /%lo:/ {print "Listening on network: "$4" "$6}'
+  grep -rhs NOPASSWD /etc/sudoers /etc/sudoers.d | grep -v '^\s*#' | sed 's/^/Passwordless sudo: /'
+  systemctl is-active -q ufw || echo "Firewall (ufw) is not active"
+  systemctl is-active -q opensnitchd || echo "OpenSnitch is not running"
+  systemctl is-enabled -q sshd 2>/dev/null && echo "sshd is enabled"
+  [[ $(readlink "/home/$NOTIFY_USER/.config/systemd/user/bt-agent.service") == /dev/null ]] \
+    || echo "bt-agent (Bluetooth auto-accept) is no longer masked"
+} | report health "System check warning"
+
+if (( AFTER_UPDATE )); then
+  log "after-update scan done"
+  [[ -f $STATE/found-new ]] || notify "Post-update scan: all clear" \
+    "No new vulnerabilities, rootkit warnings or system problems after the update."
 fi
 
 log "run complete"
